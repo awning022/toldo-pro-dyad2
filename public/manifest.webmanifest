@@ -1,0 +1,20 @@
+{
+  "name": "Agente Toldo Pro IA",
+  "short_name": "Toldo Pro IA",
+  "description": "Assistente operacional mobile do Toldo Pro.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f7fb",
+  "theme_color": "#17324d",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
