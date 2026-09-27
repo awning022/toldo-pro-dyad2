@@ -37,7 +37,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AgentMobile } from "@/components/AgentMobile";
 import { ModuleView, type ModuleKey } from "@/components/ModuleViews";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -108,9 +107,7 @@ export default function Index({ user, demo }: { user: User | null; demo: boolean
   const [menuOpen, setMenuOpen] = useState(false);
   const userName = useMemo(() => user?.user_metadata?.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "Rafael", [user]);
   const signOut = async () => { if (supabase && !demo) await supabase.auth.signOut(); else window.location.reload(); };
-  const navigate = (module: ModuleKey) => { setActive(module); if (module !== "agente") toast.info("Módulo aberto", { description: "Você está visualizando os dados da operação." }); };
-
-  if (active === "agente") return <AgentMobile userName={userName} demo={demo} onNavigate={navigate} onSignOut={signOut} />;
+  const navigate = (module: ModuleKey) => { if (module === "agente") { window.location.assign("/ia"); return; } setActive(module); toast.info("Módulo aberto", { description: "Você está visualizando os dados da operação." }); };
 
   return <div className="min-h-screen bg-[#f5f7fa] text-[#172b4d]"><div className="flex min-h-screen"><Sidebar active={active} onNavigate={navigate} open={menuOpen} onClose={() => setMenuOpen(false)} /><main className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#e9edf3] bg-[#f5f7fa]/95 px-4 backdrop-blur-md sm:px-6 lg:px-9"><div className="flex items-center gap-3"><button onClick={() => setMenuOpen(true)} className="rounded-xl border border-[#e1e7ef] bg-white p-2 text-[#52647d] shadow-sm lg:hidden" aria-label="Abrir menu"><Menu size={19} /></button><div className="flex items-center gap-2 text-[11px] font-semibold text-[#90a0b2]"><Building2 size={15} className="text-[#f47b20]" /> Toldo Pro <ChevronRight size={13} /><span className="text-[#52647d]">Operação</span></div></div><div className="flex items-center gap-2"><button onClick={() => navigate("agente")} className="flex items-center gap-2 rounded-xl bg-[#fff1e7] px-3 py-2 text-[10px] font-bold text-[#d9620d]"><Sparkles size={14} /> Abrir agente</button><button onClick={() => navigate("notificacoes")} className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-[#e1e7ef] bg-white text-[#708096] shadow-sm" aria-label="Notificações"><Bell size={17} /><span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#f47b20] ring-2 ring-white" /></button><button onClick={signOut} className="flex h-9 items-center gap-2 rounded-xl border border-[#e1e7ef] bg-white px-2 shadow-sm"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#e4b89c] text-[9px] font-bold text-[#6d3e2a]">{userName.slice(0, 2).toUpperCase()}</span><span className="hidden max-w-[90px] truncate text-[10px] font-bold text-[#52647d] sm:inline">{userName}</span></button></div></header><div className="mx-auto max-w-[1480px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">{active === "painel" ? <DashboardView onModuleChange={navigate} /> : <ModuleView module={active} onModuleChange={navigate} />}<footer className="mt-8 flex flex-col justify-between gap-2 border-t border-[#e5eaf0] pt-5 text-[10px] font-medium text-[#9aa6b6] sm:flex-row"><span>© 2024 Toldo Pro · Gestão inteligente para toldos{demo ? " · Modo demonstração" : ""}</span><span className="flex items-center gap-1.5"><CircleHelp size={12} /> Central de ajuda <span className="mx-1">·</span> Termos e privacidade</span></footer></div></main></div></div>;
 }
