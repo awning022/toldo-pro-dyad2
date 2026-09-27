@@ -2,17 +2,25 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
+  Bell,
   Bot,
   Boxes,
   CalendarDays,
+  CalendarRange,
   Camera,
+  ClipboardList,
+  DollarSign,
   Check,
   ChevronRight,
   CircleCheck,
   Clock3,
   CloudOff,
+  Download,
+  FileBarChart,
   FileText,
+  Filter,
   Hammer,
+  ListChecks,
   MapPin,
   MessageSquare,
   Mic,
@@ -20,6 +28,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Settings,
   ShieldCheck,
   Sparkles,
   Truck,
@@ -30,9 +39,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { OperationalView } from "@/components/OperationalViews";
 import { toast } from "sonner";
 
-export type ModuleKey = "painel" | "clientes" | "vendas" | "orcamentos" | "operacao" | "estoque" | "instalacoes" | "gestao" | "agente";
+export type ModuleKey = "painel" | "agenda" | "notificacoes" | "clientes" | "vendas" | "orcamentos" | "os" | "operacao" | "estoque" | "instalacoes" | "financeiro" | "relatorios" | "equipe" | "gestao" | "agente" | "configuracoes";
 type ModuleViewProps = { module: ModuleKey; onModuleChange: (module: ModuleKey) => void };
 type StatCardProps = { label: string; value: string; helper: string; icon: LucideIcon; tone: string };
 type Field = { id: string; label: string; placeholder: string; type?: string; required?: boolean };
@@ -152,13 +162,14 @@ function AgentView() {
 }
 
 export function ModuleView({ module, onModuleChange }: ModuleViewProps) {
+  if (module === "agenda" || module === "notificacoes" || module === "os" || module === "financeiro" || module === "relatorios" || module === "configuracoes") return <OperationalView module={module} onModuleChange={onModuleChange} />;
   if (module === "clientes") return <CustomersView />;
   if (module === "vendas") return <SalesView />;
   if (module === "orcamentos") return <QuotesView />;
   if (module === "operacao") return <ProductionView module={module} onModuleChange={onModuleChange} />;
   if (module === "estoque") return <StockView />;
   if (module === "instalacoes") return <InstallationsView />;
-  if (module === "gestao") return <ManagementView />;
+  if (module === "equipe" || module === "gestao") return <ManagementView />;
   if (module === "agente") return <AgentView />;
   return null;
 }
