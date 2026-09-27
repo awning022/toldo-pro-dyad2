@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import type { FormEvent } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
@@ -78,21 +77,7 @@ function StatCard({ label, value, helper, icon: Icon, tone }: StatCardProps) {
 }
 
 function PageHeading({ eyebrow, title, description, action, onAction }: { eyebrow: string; title: string; description: string; action?: string; onAction?: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [details, setDetails] = useState("");
-  const saveDraft = (event: FormEvent) => {
-    event.preventDefault();
-    const saved = JSON.parse(localStorage.getItem("toldo-pro-acoes") ?? "[]") as Array<{ action: string; name: string; details: string; createdAt: string }>;
-    saved.unshift({ action: action ?? "Ação", name, details, createdAt: new Date().toISOString() });
-    localStorage.setItem("toldo-pro-acoes", JSON.stringify(saved.slice(0, 50)));
-    setOpen(false);
-    setName("");
-    setDetails("");
-    onAction?.();
-    toast.success(`${action} salvo como rascunho`);
-  };
-  return <><div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#f47b20]">{eyebrow}</p><h1 className="font-display text-[28px] font-bold tracking-[-0.05em] text-[#172b4d]">{title}</h1><p className="mt-2 text-[13px] text-[#708096]">{description}</p></div>{action && <Button onClick={() => setOpen(true)} className="h-10 rounded-xl bg-[#f47b20] text-[11px] font-bold text-white shadow-[0_6px_14px_rgba(244,123,32,0.2)] hover:bg-[#db6812]"><Plus size={16} /> {action}</Button>}</div>{open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172b4d]/30 p-4 backdrop-blur-[2px]"><form onSubmit={saveDraft} className="w-full max-w-[440px] rounded-[24px] border border-[#e9edf3] bg-white p-5 shadow-[0_24px_70px_rgba(23,43,77,0.24)]"><div className="mb-5 flex items-start justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#f47b20]">Novo registro</p><h2 className="mt-2 font-display text-[19px] font-bold text-[#172b4d]">{action}</h2><p className="mt-1 text-[11px] text-[#8d9aaa]">Preencha os dados e salve para continuar depois.</p></div><button type="button" onClick={() => setOpen(false)} className="text-[20px] text-[#9aa6b6]" aria-label="Fechar">×</button></div><div className="grid gap-4"><label className="grid gap-1.5 text-[11px] font-bold text-[#52647d]">Nome ou identificação<Input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Cliente, ordem ou pedido" required className="h-10 rounded-xl text-[12px]" /></label><label className="grid gap-1.5 text-[11px] font-bold text-[#52647d]">Detalhes e observações<textarea value={details} onChange={(event) => setDetails(event.target.value)} placeholder="Descreva o que precisa ser registrado" className="min-h-[90px] rounded-xl border border-[#e1e7ef] p-3 text-[12px] font-normal outline-none focus:border-[#f47b20]" /></label></div><div className="mt-5 flex justify-end gap-2"><Button type="button" variant="ghost" onClick={() => setOpen(false)} className="rounded-xl text-[11px] font-bold">Cancelar</Button><Button type="submit" className="rounded-xl bg-[#172b4d] text-[11px] font-bold hover:bg-[#274263]">Salvar registro</Button></div></form></div>}</>;
+  return <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end"><div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-[#f47b20]">{eyebrow}</p><h1 className="font-display text-[28px] font-bold tracking-[-0.05em] text-[#172b4d]">{title}</h1><p className="mt-2 text-[13px] text-[#708096]">{description}</p></div>{action && <Button onClick={onAction} className="h-10 rounded-xl bg-[#f47b20] text-[11px] font-bold text-white shadow-[0_6px_14px_rgba(244,123,32,0.2)] hover:bg-[#db6812]"><Plus size={16} /> {action}</Button>}</div>;
 }
 
 function CustomersView() {
