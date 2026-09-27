@@ -40,6 +40,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OperationalView } from "@/components/OperationalViews";
+import { WorkflowView } from "@/components/WorkflowViews";
 import { toast } from "sonner";
 
 export type ModuleKey = "painel" | "agenda" | "notificacoes" | "clientes" | "vendas" | "orcamentos" | "os" | "operacao" | "estoque" | "instalacoes" | "financeiro" | "relatorios" | "equipe" | "gestao" | "agente" | "configuracoes";
@@ -162,14 +163,10 @@ function AgentView() {
 }
 
 export function ModuleView({ module, onModuleChange }: ModuleViewProps) {
-  if (module === "agenda" || module === "notificacoes" || module === "os" || module === "financeiro" || module === "relatorios" || module === "configuracoes") return <OperationalView module={module} onModuleChange={onModuleChange} />;
-  if (module === "clientes") return <CustomersView />;
-  if (module === "vendas") return <SalesView />;
-  if (module === "orcamentos") return <QuotesView />;
-  if (module === "operacao") return <ProductionView module={module} onModuleChange={onModuleChange} />;
+  if (module === "clientes" || module === "vendas" || module === "orcamentos" || module === "os" || module === "operacao" || module === "equipe" || module === "gestao") return <WorkflowView module={module} onModuleChange={onModuleChange} />;
+  if (module === "agenda" || module === "notificacoes" || module === "financeiro" || module === "relatorios" || module === "configuracoes") return <OperationalView module={module} onModuleChange={onModuleChange} />;
   if (module === "estoque") return <StockView />;
   if (module === "instalacoes") return <InstallationsView />;
-  if (module === "equipe" || module === "gestao") return <ManagementView />;
   if (module === "agente") return <AgentView />;
   return null;
 }

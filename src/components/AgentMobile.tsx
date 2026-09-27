@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp,
+  BarChart3,
   Bell,
   CalendarDays,
   Check,
   ChevronRight,
   CircleAlert,
+  ClipboardList,
   Cloud,
   CloudOff,
+  DollarSign,
   Download,
   FileText,
   Headphones,
@@ -36,6 +39,32 @@ import {
   X,
 } from "lucide-react";
 import type { ModuleKey } from "@/components/ModuleViews";
+import {
+  buildAssistantResult,
+  type AssistantCategory,
+  type AssistantPendingAction,
+  type AssistantSnapshot,
+} from "@/lib/operationalAssistant";
+import {
+  defaultAgendaEvents,
+  defaultCustomers,
+  defaultFinancialEntries,
+  defaultInstallations,
+  defaultLeads,
+  defaultMaterials,
+  defaultProduction,
+  defaultQuotes,
+  defaultWorkOrders,
+  type AssistantCustomer,
+  type AssistantEvent,
+  type AssistantFinancialEntry,
+  type AssistantInstallation,
+  type AssistantLead,
+  type AssistantMaterial,
+  type AssistantProduction,
+  type AssistantQuote,
+  type AssistantWorkOrder,
+} from "@/lib/operationalData";
 import { toast } from "sonner";
 
 type AgentMobileProps = {
@@ -45,10 +74,10 @@ type AgentMobileProps = {
   onSignOut: () => void;
 };
 
-type ChatMessage = { id: string; from: "ai" | "user"; text: string; time?: string };
+type ChatMessage = { id: string; from: "ai" | "user"; text: string; time?: string; category?: AssistantCategory };
 type SyncStatus = "pending" | "syncing" | "synced" | "failed";
 type SyncItem = { id: string; title: string; kind: "command" | "action"; status: SyncStatus; createdAt: string };
-type PendingAction = { title: string; description: string };
+type PendingAction = AssistantPendingAction & { category: AssistantCategory };
 type SpeechRecognitionLike = {
   lang: string;
   interimResults: boolean;
@@ -63,21 +92,35 @@ type SpeechConstructor = new () => SpeechRecognitionLike;
 type InstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> };
 
 const quickActions: { label: string; helper: string; icon: typeof CalendarDays; tone: string; prompt: string }[] = [
-  { label: "Agenda", helper: "Hoje e amanhã", icon: CalendarDays, tone: "bg-[#eaf1ff] text-[#2859a6]", prompt: "Quais instalações eu tenho hoje e amanhã?" },
-  { label: "Clientes", helper: "Consultar CRM", icon: Users, tone: "bg-[#f2edff] text-[#7351c7]", prompt: "Mostre meus clientes recentes." },
-  { label: "Estoque", helper: "2 itens críticos", icon: Package, tone: "bg-[#eaf8f3] text-[#15835e]", prompt: "Liste o estoque baixo." },
-  { label: "Orçamentos", helper: "8 aguardando", icon: FileText, tone: "bg-[#fff5db] text-[#a97810]", prompt: "Mostre os orçamentos pendentes." },
-  { label: "Criar lead", helper: "Novo contato", icon: UserRound, tone: "bg-[#fff2e8] text-[#d76a21]", prompt: "Crie um lead para o WhatsApp." },
-  { label: "Criar visita", helper: "Agendar campo", icon: CalendarDays, tone: "bg-[#eaf1ff] text-[#2859a6]", prompt: "Crie uma visita para amanhã." },
-  { label: "Medição", helper: "Registrar campo", icon: Ruler, tone: "bg-[#eaf8f3] text-[#15835e]", prompt: "Registre essa medição." },
-  { label: "Sincronizar", helper: "Enviar pendências", icon: RefreshCw, tone: "bg-[#17324d] text-white", prompt: "Sincronize as pendências." },
+  { label: "Agenda", helper: "Hoje e amanhã", icon: CalendarDays, tone: "bg-[#eaf1ff] text-[#2859a6]", prompt: "Resuma minha agenda de hoje." },
+  { label: "Clientes", helper: "Sem resposta", icon: Users, tone: "bg-[#f2edff] text-[#7351c7]", prompt: "Quais clientes estão sem resposta?" },
+  { label: "Leads", helper: "Funil comercial", icon: UserRound, tone: "bg-[#fff2e8] text-[#d76a21]", prompt: "Liste meus leads." },
+  { label: "Orçamentos", helper: "Aguardando retorno", icon: FileText, tone: "bg-[#fff5db] text-[#a97810]", prompt: "Quais orçamentos estão pendentes?" },
+  { label: "OS", helper: "Ordens abertas", icon: ClipboardList, tone: "bg-[#eaf1ff] text-[#2859a6]", prompt: "Liste as OS abertas." },
+  { label: "Estoque", helper: "Itens críticos", icon: Package, tone: "bg-[#eaf8f3] text-[#15835e]", prompt: "Qual estoque está baixo?" },
+  { label: "Financeiro", helper: "Pagamentos em aberto", icon: DollarSign, tone: "bg-[#f2edff] text-[#7351c7]", prompt: "Mostre os pagamentos em aberto." },
+  { label: "Produção", helper: "Ordens em andamento", icon: Wrench, tone: "bg-[#fff2e8] text-[#d76a21]", prompt: "Como está a produção?" },
+  { label: "Manutenção", helper: "Chamados abertos", icon: Ruler, tone: "bg-[#eaf8f3] text-[#15835e]", prompt: "Quais manutenções estão abertas?" },
+  { label: "Relatórios", helper: "Indicadores", icon: BarChart3, tone: "bg-[#eaf1ff] text-[#2859a6]", prompt: "Mostre os principais indicadores." },
+  { label: "Criar lead", helper: "Ação protegida", icon: UserRound, tone: "bg-[#fff2e8] text-[#d76a21]", prompt: "Crie um lead." },
+  { label: "Sincronizar", helper: "Fila offline", icon: RefreshCw, tone: "bg-[#17324d] text-white", prompt: "Sincronize a fila." },
 ];
 
-const agendaItems = [
-  { time: "08:30", title: "Medição · Ana Beatriz", meta: "Vila Madalena · Equipe Carlos", tone: "bg-[#fff0e3] text-[#d76a21]" },
-  { time: "10:00", title: "Instalação · Clínica Vitta", meta: "Pinheiros · Equipe João", tone: "bg-[#eaf1ff] text-[#2859a6]" },
-  { time: "Amanhã · 08:30", title: "Instalação · Marina Lopes", meta: "Vila Madalena · Equipe Carlos", tone: "bg-[#f2edff] text-[#7351c7]" },
-];
+const categoryLabels: Record<AssistantCategory, string> = {
+  agenda: "Agenda",
+  clientes: "Clientes",
+  comercial: "Comercial",
+  orcamentos: "Orçamentos",
+  os: "OS",
+  producao: "Produção",
+  estoque: "Estoque",
+  financeiro: "Financeiro",
+  instalacoes: "Instalações",
+  manutencao: "Manutenção",
+  relatorios: "Relatórios",
+  sincronizacao: "Sincronização",
+  sistema: "Operação",
+};
 
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -125,11 +168,21 @@ export function AgentMobile({ userName, demo, onNavigate, onSignOut }: AgentMobi
   const [agentStatus, setAgentStatus] = useState<"idle" | "typing" | "thinking" | "responding">("idle");
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [isInstalled] = useState(() => window.matchMedia?.("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true);
-  const [messages, setMessages] = useStored<ChatMessage[]>("toldo:agent-messages", [{ id: "welcome", from: "ai", text: `Olá, ${userName}! Sou seu assistente operacional. Posso consultar agenda, clientes, estoque e registrar atividades no Toldo Pro.`, time: "agora" }]);
+  const [messages, setMessages] = useStored<ChatMessage[]>("toldo:agent-messages", [{ id: "welcome", from: "ai", text: "Resumo operacional pronto.\nAgenda, clientes, estoque e fila local disponíveis.\nPróxima ação: diga o módulo ou comando que precisa resolver.", time: "agora", category: "sistema" }]);
   const [queue, setQueue] = useStored<SyncItem[]>("toldo:sync-queue", []);
+  const [customers] = useStored<AssistantCustomer[]>("toldo:customers", defaultCustomers);
+  const [leads] = useStored<AssistantLead[]>("toldo:leads", defaultLeads);
+  const [quotes] = useStored<AssistantQuote[]>("toldo:quotes", defaultQuotes);
+  const [production] = useStored<AssistantProduction[]>("toldo:production", defaultProduction);
+  const [materials] = useStored<AssistantMaterial[]>("toldo:materials", defaultMaterials);
+  const [installations] = useStored<AssistantInstallation[]>("toldo:installations", defaultInstallations);
+  const [agenda] = useStored<AssistantEvent[]>("toldo:agenda-events", defaultAgendaEvents);
+  const [workOrders] = useStored<AssistantWorkOrder[]>("toldo:work-orders", defaultWorkOrders);
+  const [financialEntries] = useStored<AssistantFinancialEntry[]>("toldo:financial-entries", defaultFinancialEntries);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
   const pendingCount = queue.filter((item) => item.status === "pending" || item.status === "syncing" || item.status === "failed").length;
+  const assistantSnapshot: AssistantSnapshot = { customers, leads, quotes, production, materials, installations, agenda, workOrders, financialEntries, pendingQueue: pendingCount, online };
   const initials = userName.slice(0, 2).toUpperCase();
 
   useEffect(() => {
@@ -155,7 +208,7 @@ export function AgentMobile({ userName, demo, onNavigate, onSignOut }: AgentMobi
     window.setTimeout(() => setQueue((current) => current.map((item) => ids.includes(item.id) ? { ...item, status: "synced" } : item)), 850);
   }, [online, queue, setQueue]);
 
-  useEffect(() => { if (online) syncPending(); }, [online]);
+  useEffect(() => { if (online) syncPending(); }, [online, syncPending]);
 
   const addToQueue = useCallback((title: string, kind: SyncItem["kind"]) => {
     const id = `${kind}:${title.trim().toLocaleLowerCase("pt-BR")}`;
@@ -166,20 +219,7 @@ export function AgentMobile({ userName, demo, onNavigate, onSignOut }: AgentMobi
     if (online) window.setTimeout(() => setQueue((current) => current.map((item) => item.id === id ? { ...item, status: "synced" } : item)), 850);
   }, [online, setQueue]);
 
-  const appendMessage = (from: ChatMessage["from"], text: string) => setMessages((current) => [...current, { id: makeId("message"), from, text, time: "agora" }]);
-
-  const answerFor = (text: string) => {
-    const normalized = text.toLocaleLowerCase("pt-BR");
-    if (normalized.includes("instala") && normalized.includes("amanhã")) return "Amanhã: 08:30 com Marina Lopes, Rua Harmonia, 245. Equipe Carlos, 2 pessoas.";
-    if (normalized.includes("cliente") || normalized.includes("crm")) return "Encontrei 4 clientes ativos. Marina Lopes e Clínica Vitta têm os próximos atendimentos na agenda.";
-    if (normalized.includes("orçamento") || normalized.includes("orcamento")) return "3 orçamentos importantes: 1 aprovado, 1 em negociação e 1 enviado. O #1538 aguarda a Clínica Vitta.";
-    if (normalized.includes("estoque") || normalized.includes("baixo")) return "2 itens críticos: lona bege 3,00m (18 m de 25 m) e motor tubular 45Nm (7 de 10 un.).";
-    if (normalized.includes("financeiro") || normalized.includes("faturamento")) return "Faturamento do mês: R$ 184.620. Há 38 orçamentos abertos no funil comercial.";
-    if (normalized.includes("pendên") || normalized.includes("penden")) return `Você tem ${pendingCount || 3} pendências locais. Posso listar, revisar ou sincronizar cada uma.`;
-    if (normalized.includes("sincron")) return online ? "Sincronização iniciada. Nenhum registro será duplicado." : "Assim que a conexão voltar, sincronizo automaticamente as pendências.";
-    if (normalized.includes("lead") || normalized.includes("whatsapp")) return "Posso criar um lead a partir desta conversa. Antes de criar ou enviar, preciso da sua confirmação.";
-    return "Posso consultar dados ou preparar uma ação. Você quer consultar, criar ou registrar?";
-  };
+  const appendMessage = (from: ChatMessage["from"], text: string, category?: AssistantCategory) => setMessages((current) => [...current, { id: makeId("message"), from, text, time: "agora", category }]);
 
   const send = (rawText = command) => {
     const text = rawText.trim();
@@ -187,24 +227,22 @@ export function AgentMobile({ userName, demo, onNavigate, onSignOut }: AgentMobi
     appendMessage("user", text);
     setCommand("");
     setAgentStatus("thinking");
-    const normalized = text.toLocaleLowerCase("pt-BR");
-    const needsConfirmation = /crie|criar|registre|registrar|exclua|excluir|altere|alterar|envie|enviar/.test(normalized);
     window.setTimeout(() => {
-      if (needsConfirmation) {
-        setPendingAction({ title: text, description: "Esta ação será registrada no Toldo Pro com as permissões do seu usuário." });
-        respond("Posso preparar essa ação para você. Confirme abaixo para continuar — ações críticas nunca são executadas sem autorização.");
+      const result = buildAssistantResult(text, assistantSnapshot);
+      if (result.pendingAction) {
+        setPendingAction({ ...result.pendingAction, category: result.category });
+        respond(result.text, result.category);
         return;
       }
-      if (!online) addToQueue(text, "command");
-      if (normalized.includes("sincron")) syncPending();
-      respond(online ? answerFor(text) : "Comando registrado na fila offline. Vou processar quando a conexão com o Toldo Pro voltar.");
-    }, 520);
+      if (result.intent === "sync" && online) syncPending();
+      respond(result.text, result.category);
+    }, 360);
   };
 
   const confirmAction = () => {
     if (!pendingAction) return;
     addToQueue(pendingAction.title, "action");
-    respond(online ? "Ação autorizada e enviada para a fila segura do Toldo Pro. Você verá o status aqui até concluir." : "Ação autorizada e guardada localmente. Ela será sincronizada automaticamente quando você voltar a ficar online.");
+    respond(online ? "Ação autorizada e enviada para a fila do Toldo Pro.\nRegistro protegido pelas permissões atuais do usuário.\nPróxima ação: acompanhar a sincronização na fila." : "Ação autorizada e salva localmente.\nO registro permanece protegido no aparelho até a conexão voltar.\nPróxima ação: sincronizar a fila quando estiver online.", pendingAction.category);
     setPendingAction(null);
   };
 
@@ -249,8 +287,9 @@ export function AgentMobile({ userName, demo, onNavigate, onSignOut }: AgentMobi
 
   const shortcuts = useMemo(() => quickActions, []);
   const latestQueue = queue.filter((item) => item.status !== "synced").slice(0, 3);
+  const agendaItems = agenda.slice(0, 3).map((item) => ({ time: item.time, title: item.title, meta: `${item.customer} · ${item.location}`, tone: item.tone }));
   const scrollToConversation = () => chatRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  const respond = (text: string) => { setAgentStatus("responding"); appendMessage("ai", text); window.setTimeout(() => setAgentStatus("idle"), 1300); };
+  const respond = (text: string, category: AssistantCategory = "sistema") => { setAgentStatus("responding"); appendMessage("ai", text, category); window.setTimeout(() => setAgentStatus("idle"), 1300); };
 
   return <div className={dark ? "min-h-screen bg-[#0f2033] text-[#edf5fc]" : "min-h-screen bg-[#f4f7fb] text-[#17324d]"}>
     <div className="mx-auto min-h-screen max-w-[1180px]">
