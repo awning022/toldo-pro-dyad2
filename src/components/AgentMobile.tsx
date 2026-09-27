@@ -8,6 +8,7 @@ import {
   CircleAlert,
   Cloud,
   CloudOff,
+  Download,
   FileText,
   Headphones,
   Home,
@@ -123,6 +124,7 @@ export function AgentMobile({ userName, demo, onNavigate, onSignOut }: AgentMobi
   const [showProfile, setShowProfile] = useState(false);
   const [agentStatus, setAgentStatus] = useState<"idle" | "typing" | "thinking" | "responding">("idle");
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [isInstalled] = useState(() => window.matchMedia?.("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true);
   const [messages, setMessages] = useStored<ChatMessage[]>("toldo:agent-messages", [{ id: "welcome", from: "ai", text: `Olá, ${userName}! Sou seu assistente operacional. Posso consultar agenda, clientes, estoque e registrar atividades no Toldo Pro.`, time: "agora" }]);
   const [queue, setQueue] = useStored<SyncItem[]>("toldo:sync-queue", []);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
@@ -232,7 +234,7 @@ export function AgentMobile({ userName, demo, onNavigate, onSignOut }: AgentMobi
 
   const installApp = async () => {
     if (!installPrompt) {
-      toast.info("Para instalar", { description: "Abra o menu do navegador e escolha 'Adicionar à tela inicial'." });
+      toast.info("Instalar o Toldo Pro IA", { description: "Android: menu ⋮ > Instalar app. iPhone: Compartilhar > Adicionar à Tela de Início." });
       return;
     }
     await installPrompt.prompt();
@@ -261,6 +263,8 @@ export function AgentMobile({ userName, demo, onNavigate, onSignOut }: AgentMobi
 
       <main className="px-4 pb-[112px] pt-6 sm:px-7 sm:pt-8">
         <section className="mb-6 flex items-end justify-between gap-4"><div><p className={`mb-2 text-[11px] font-bold ${dark ? "text-[#a4bbcf]" : "text-[#8194a9]"}`}>Quarta-feira, 18 de setembro <span className="mx-1 text-[#f47b20]">·</span> Toldo Silva & Cia</p><h1 className={`font-display text-[28px] font-extrabold tracking-[-0.06em] sm:text-[34px] ${dark ? "text-white" : "text-[#17324d]"}`}>Bom dia, <span className="text-[#f47b20]">{userName}.</span></h1><p className={`mt-2 max-w-[420px] text-[13px] leading-5 ${dark ? "text-[#a4bbcf]" : "text-[#71859c]"}`}>Seu resumo operacional e o assistente que mantém o time em movimento.</p></div><button onClick={installApp} className="hidden items-center gap-2 rounded-xl bg-[#17324d] px-3 py-2 text-[10px] font-bold text-white shadow-[0_8px_18px_rgba(23,50,77,0.16)] sm:flex"><Plus size={14} /> Instalar app</button></section>
+
+        {!isInstalled && <section className={dark ? "mb-5 flex items-center gap-3 rounded-[20px] border border-white/10 bg-[#172d44] p-3" : "mb-5 flex items-center gap-3 rounded-[20px] border border-[#f5d7bf] bg-[#fff8f3] p-3"}><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f47b20] text-white"><Download size={17} /></div><div className="min-w-0 flex-1"><p className={dark ? "text-[11px] font-extrabold text-white" : "text-[11px] font-extrabold text-[#6b341b]"}>Instale o Toldo Pro IA no celular</p><p className={dark ? "mt-1 text-[10px] leading-4 text-[#a4bbcf]" : "mt-1 text-[10px] leading-4 text-[#9b6a4f]"}>Android: menu ⋮ e “Instalar app”. iPhone: Compartilhar e “Adicionar à Tela de Início”.</p></div><button onClick={installApp} className="shrink-0 rounded-xl bg-[#f47b20] px-3 py-2 text-[10px] font-extrabold text-white">Instalar</button></section>}
 
         <section className="mb-7 grid gap-3 md:grid-cols-[1.15fr_.85fr]"><div className="overflow-hidden rounded-[24px] bg-[#17324d] p-5 text-white shadow-[0_16px_36px_rgba(23,50,77,0.15)] sm:p-6"><div className="flex items-start justify-between gap-4"><div><div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#a7bdd2]"><Sparkles size={14} className="text-[#f6a05b]" /> Assistente operacional</div><h2 className="max-w-[400px] font-display text-[22px] font-extrabold leading-tight tracking-[-0.05em] sm:text-[26px]">O que você precisa resolver agora?</h2><p className="mt-3 max-w-[390px] text-[12px] leading-5 text-[#b6c7d8]">Consulte dados reais, registre o campo e acompanhe pendências com segurança.</p></div><div className="hidden h-12 w-12 items-center justify-center rounded-2xl bg-[#f47b20] sm:flex"><Headphones size={21} /></div></div><div className="mt-5 flex flex-wrap gap-2"><button onClick={() => send("Quais instalações eu tenho amanhã?")} className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-[10px] font-bold text-white transition hover:bg-white/15">Agenda de amanhã</button><button onClick={() => send("Liste o estoque baixo.")} className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-[10px] font-bold text-white transition hover:bg-white/15">Estoque baixo</button></div></div><div className={`rounded-[24px] border p-5 shadow-[0_10px_25px_rgba(35,67,101,0.05)] ${dark ? "border-white/10 bg-[#172d44]" : "border-[#e4ebf3] bg-white"}`}><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#eaf8f3] text-[#15835e]"><CalendarDays size={17} /></div><div><p className={`text-[11px] font-bold ${dark ? "text-white" : "text-[#516980]"}`}>Resumo do dia</p><p className={`mt-0.5 text-[10px] ${dark ? "text-[#94abc1]" : "text-[#9aabba]"}`}>Sua próxima parada</p></div></div><span className="rounded-full bg-[#fff2e8] px-2 py-1 text-[9px] font-bold text-[#d76a21]">4 hoje · 1 amanhã</span></div><div className="mt-4 space-y-3">{agendaItems.map((item) => <button key={item.time} onClick={() => onNavigate("instalacoes")} className={`flex w-full items-center gap-3 rounded-2xl p-2 text-left ${dark ? "hover:bg-white/5" : "hover:bg-[#f7f9fc]"}`}><span className="w-10 text-[11px] font-extrabold text-[#f47b20]">{item.time}</span><span className={`flex h-8 w-8 items-center justify-center rounded-xl ${item.tone}`}><Wrench size={14} /></span><span className="min-w-0 flex-1"><span className={`block truncate text-[11px] font-bold ${dark ? "text-white" : "text-[#35506a]"}`}>{item.title}</span><span className={`mt-0.5 block truncate text-[10px] ${dark ? "text-[#94abc1]" : "text-[#95a6b6]"}`}>{item.meta}</span></span><ChevronRight size={14} className={dark ? "text-[#68839c]" : "text-[#c4d0dc]"} /></button>)}</div><button onClick={() => onNavigate("instalacoes")} className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl bg-[#f5f8fb] py-2.5 text-[10px] font-bold text-[#3567ae]">Abrir agenda completa <ChevronRight size={13} /></button></div></section>
 
