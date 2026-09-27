@@ -66,6 +66,24 @@ export type WorkflowOS = {
   history: WorkflowHistory[];
 };
 
+export type InstallationStatus = "Agendada" | "A caminho" | "Instalando" | "Concluída";
+
+export type WorkflowInstallation = {
+  id: string;
+  time: string;
+  customer: string;
+  address: string;
+  team: string;
+  status: InstallationStatus;
+  observations?: string;
+  photos?: string[]; // base64 or URLs
+  productionId?: string;
+  osId?: string;
+  quoteId?: string;
+  clientId?: string;
+  history: WorkflowHistory[];
+};
+
 export type WorkflowProduction = {
   id: string;
   osId: string;
@@ -125,6 +143,7 @@ export const defaultWorkflowClients: WorkflowClient[] = [
 
 export const defaultWorkflowOS: WorkflowOS[] = [];
 export const defaultWorkflowProduction: WorkflowProduction[] = [];
+export const defaultWorkflowInstallations: WorkflowInstallation[] = [];
 
 export function readWorkflowList<T>(key: string, fallback: T[]) {
   const saved = window.localStorage.getItem(key);
