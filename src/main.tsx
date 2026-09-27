@@ -6,7 +6,9 @@ import "./App.css";
 createRoot(document.getElementById("root")!).render(<App />);
 
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" }).catch(() => undefined);
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function () {
+      return undefined;
+    });
   });
 }
