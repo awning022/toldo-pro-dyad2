@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap');
+
+#root {
+  min-height: 100vh;
+}
+
+.font-display {
+  font-family: 'Manrope', sans-serif;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+}
+
+button,
+select,
+input {
+  font-family: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .metric-card,
+  main > header,
+  aside {
+    animation: soft-enter 420ms ease-out both;
+  }
+}
+
+@keyframes soft-enter {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d7e0ea; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #b8c6d6; }
