@@ -131,8 +131,36 @@ function QuotesView() {
 
 function ProductionView({ onModuleChange }: ModuleViewProps) {
   const [orders, setOrders] = useStoredList("toldo:production", initialProduction);
+  const [, setInst] = useStoredList("toldo:installations", initialInstallations);
   const [open, setOpen] = useState(false);
-  return <div><PageHeading eyebrow="Operação" title="Produção, estoque e instalações" description="Mantenha materiais, ordens e equipes sincronizados em cada entrega." action="Nova ordem de produção" onAction={() => setOpen(true)} /><div className="grid grid-cols-1 gap-4 sm:grid-cols-3"><StatCard label="Ordens em produção" value={String(orders.length)} helper="salvas neste dispositivo" icon={Hammer} tone="bg-[#fff1e7] text-[#d9620d]" /><StatCard label="Itens em estoque" value="1.284" helper="2 alertas de mínimo" icon={Boxes} tone="bg-[#eaf2ff] text-[#1453a6]" /><StatCard label="Instalações agendadas" value="24" helper="4 nesta semana" icon={Wrench} tone="bg-[#eaf8f2] text-[#14835b]" /></div><div className="mt-5 rounded-[22px] border border-[#e9edf3] bg-white p-5 shadow-[0_8px_24px_rgba(24,43,73,0.04)]"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-display text-[16px] font-bold text-[#172b4d]">Ordens de produção</h2><p className="mt-1 text-[11px] text-[#8d9aaa]">Clique em uma ordem para avançar o status.</p></div><button onClick={() => onModuleChange("estoque")} className="text-[11px] font-bold text-[#1453a6]">Ver materiais</button></div><div className="space-y-3">{orders.map((order) => <button key={order.id} onClick={() => setOrders((current) => current.map((item) => item.id === order.id ? { ...item, status: item.status === "Aguardando produção" ? "Em produção" : item.status === "Em produção" ? "Acabamento" : "Pronto" } : item))} className="flex w-full flex-col gap-3 rounded-2xl border border-[#edf1f5] p-4 text-left transition hover:border-[#f3b07f] sm:flex-row sm:items-center"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#fff1e7] text-[#d9620d]"><Hammer size={16} /></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="text-[12px] font-bold text-[#344861]">{order.id} · {order.customer}</p><span className="rounded-full bg-[#fff1e7] px-2 py-0.5 text-[9px] font-bold text-[#d9620d]">{order.priority}</span></div><p className="mt-1 truncate text-[11px] text-[#9aa6b6]">{order.product} · {order.owner}</p></div><div className="sm:text-right"><p className="text-[11px] font-bold text-[#52647d]">{order.status}</p><p className="mt-1 text-[10px] text-[#9aa6b6]">Prazo: {order.due}</p></div><ChevronRight size={15} className="text-[#c4cfdb]" /></button>)}</div></div>{open && <CreateDialog title="Nova ordem de produção" fields={[{ id: "customer", label: "Cliente", placeholder: "Ex.: Clínica Vitta" }, { id: "product", label: "Toldo ou produto", placeholder: "Ex.: Toldo articulado 32m²" }, { id: "due", label: "Prazo", placeholder: "Ex.: 25 set" }]} onClose={() => setOpen(false)} onSave={(values) => { setOrders((current) => [{ id: `OP-${85 + current.length}`, customer: values.customer, product: values.product, owner: "A definir", due: values.due, status: "Aguardando produção", priority: "Normal" }, ...current]); setOpen(false); toast.success("Ordem de produção salva"); }} />}</div>;
+  return <div><PageHeading eyebrow="Operação" title="Produção, estoque e instalações" description="Mantenha materiais, ordens e equipes sincronizados em cada entrega." action="Nova ordem de produção" onAction={() => setOpen(true)} /><div className="grid grid-cols-1 gap-4 sm:grid-cols-3"><StatCard label="Ordens em produção" value={String(orders.length)} helper="salvas neste dispositivo" icon={Hammer} tone="bg-[#fff1e7] text-[#d9620d]" /><StatCard label="Itens em estoque" value="1.284" helper="2 alertas de mínimo" icon={Boxes} tone="bg-[#eaf2ff] text-[#1453a6]" /><StatCard label="Instalações agendadas" value="24" helper="4 nesta semana" icon={Wrench} tone="bg-[#eaf8f2] text-[#14835b]" /></div><div className="mt-5 rounded-[22px] border border-[#e9edf3] bg-white p-5 shadow-[0_8px_24px_rgba(24,43,73,0.04)]"><div className="mb-5 flex items-center justify-between"><div><h2 className="font-display text-[16px] font-bold text-[#172b4d]">Ordens de produção</h2><p className="mt-1 text-[11px] text-[#8d9aaa]">Clique em uma ordem para avançar o status.</p></div><button onClick={() => onModuleChange("estoque")} className="text-[11px] font-bold text-[#1453a6]">Ver materiais</button></div><div className="space-y-3">{orders.map((order) => <button key={order.id} onClick={() => setOrders((current) => current.map((item) => item.id === order.id ? { ...item, status: item.status === "Aguardando produção" ? "Em produção" : item.status === "Em produção" ? "Acabamento" : "Pronto" } : item))} className="flex w-full flex-col gap-3 rounded-2xl border border-[#edf1f5] p-4 text-left transition hover:border-[#f3b07f] sm:flex-row sm:items-center"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#fff1e7] text-[#d9620d]"><Hammer size={16} /></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="text-[12px] font-bold text-[#344861]">{order.id} · {order.customer}</p><span className="rounded-full bg-[#fff1e7] px-2 py-0.5 text-[9px] font-bold text-[#d9620d]">{order.priority}</span></div><p className="mt-1 truncate text-[11px] text-[#9aa6b6]">{order.product} · {order.owner}</p></div><div className="sm:text-right"><p className="text-[11px] font-bold text-[#52647d]">{order.status}</p><p className="mt-1 text-[10px] text-[#9aa6b6]">Prazo: {order.due}</p></div><ChevronRight size={15} className="text-[#c4cfdb]" /></button>)}</div></div>
+
+{/* Botão para mover ordens prontas para instalação */}
+{orders.some((o) => o.status === "Pronto") && (
+  <Button
+    onClick={() => {
+      const pronto = orders.filter((o) => o.status === "Pronto");
+      setInst((current) => {
+        const newInstalls = pronto.map((order) => ({
+          id: `install-${Date.now()}-${order.id}`,
+          time: `Hoje ${new Date().toLocaleTimeString()}`,
+          customer: order.customer,
+          address: `Produção: ${order.id} - ${order.product}`,
+          team: order.owner || "Equipe Padrão",
+          status: "Agendada",
+        }));
+        return [...current, ...newInstalls];
+      });
+      toast.success(`${pronto.length} ordem(ns) movida(s) para instalação`);
+      onModuleChange("instalacoes");
+    }}
+    className="mt-4 w-full rounded-xl bg-[#f47b20] text-[11px] font-bold text-white hover:bg-[#db6812]"
+  >
+    Mover ordens prontas para instalação
+  </Button>
+)}
+
+{open && <CreateDialog title="Nova ordem de produção" fields={[{ id: "customer", label: "Cliente", placeholder: "Ex.: Clínica Vitta" }, { id: "product", label: "Toldo ou produto", placeholder: "Ex.: Toldo articulado 32m²" }, { id: "due", label: "Prazo", placeholder: "Ex.: 25 set" }]} onClose={() => setOpen(false)} onSave={(values) => { setOrders((current) => [{ id: `OP-${85 + current.length}`, customer: values.customer, product: values.product, owner: "A definir", due: values.due, status: "Aguardando produção", priority: "Normal" }, ...current]); setOpen(false); toast.success("Ordem de produção salva"); }} />}</div>;
 }
 
 function StockView() {
