@@ -5,7 +5,7 @@ Application for managing customers, quotes, work orders, production, installatio
 ## Supabase setup
 
 1. Create a Supabase project and configure its authentication email templates and site/redirect URLs for the deployed app.
-2. Copy `.env.example` to `.env.local` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the project API settings. These are public frontend settings; never put a service-role key or Gemini key in a `VITE_` variable.
+2. Copy `.env.example` to `.env.local` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the project API settings. `VITE_SUPABASE_ANON_KEY` accepts the project's publishable key (`sb_publishable_...`); both settings are public frontend values. Never put a secret/service-role key or Gemini key in a `VITE_` variable.
 3. Apply all migrations in order with the Supabase CLI:
 
    ```sh
@@ -22,7 +22,7 @@ Application for managing customers, quotes, work orders, production, installatio
    supabase functions deploy assistant-chat
    ```
 
-   Supabase provides the standard `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` function secrets. `APP_URL` is used in employee invitation links.
+   Supabase provides the standard `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` function secrets. Edge Functions use the Deno `supabase-js` import directly, so no Node server package is required. `APP_URL` is used in employee invitation links.
 
 5. In Vercel, import/link this repository as a Vite project. The existing `vercel.json` rewrites application routes to `index.html`. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Vercel project's Development, Preview, and Production environments using the values from Supabase **Project Settings → API**. Do not add `GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, or any other server secret to Vercel frontend variables. Redeploy after adding or changing the public variables.
 6. In Supabase **Authentication → URL Configuration**, set the production Vercel origin as the Site URL and allow the exact callback URL `<production-origin>/auth/confirm` (plus local and only the Preview callback URLs you use). Signup confirmation, password recovery, employee invitations, and email changes all return through `/auth/confirm`; the app then routes to `/`, `/?setup=1`, `/auth/reset-password`, or `/auth/change-email` as appropriate. Set the Supabase function secret `APP_URL` to the production Vercel origin so employee invitations return to the deployed app.
