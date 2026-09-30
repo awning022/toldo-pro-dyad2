@@ -356,7 +356,12 @@ function WorkflowPermissionsView() {
     await loadEmployees();
   };
   const updateEmployee = async (employee: typeof employees[number], values: Partial<Pick<typeof employee, "role" | "permissions" | "active">>) => {
-    const { error } = await supabase.from("company_members").update(values).eq("id", employee.id).eq("company_id", access.companyId);
+    const { error } = await supabase.rpc("update_company_member_access", {
+      p_membership_id: employee.id,
+      p_role: values.role ?? employee.role,
+      p_permissions: values.permissions ?? employee.permissions,
+      p_active: values.active ?? employee.active,
+    });
     if (error) {
       toast.error("Não foi possível salvar as alterações de acesso.", { description: error.message });
       return;
