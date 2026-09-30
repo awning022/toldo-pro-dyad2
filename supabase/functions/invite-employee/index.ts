@@ -60,7 +60,17 @@ Deno.serve(async (request) => {
   }
 
   const admin = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } });
-  const redirectTo = `${appUrl.replace(/\/$/, "")}/?setup=1`;
+  let redirectTo: string;
+  try {
+    const redirectUrl = new URL("/auth/confirm", appUrl);
+    if (!["http:", "https:"].includes(redirectUrl.protocol) || redirectUrl.username || redirectUrl.password) {
+      return json(500, { error: "APP_URL must be a valid HTTP(S) application URL" });
+    }
+    redirectUrl.searchParams.set("setup", "1");
+    redirectTo = redirectUrl.toString();
+  } catch {
+    return json(500, { error: "APP_URL must be a valid HTTP(S) application URL" });
+  }
   const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo,
     data: { full_name: fullName, phone, company_id: membership.company_id },
