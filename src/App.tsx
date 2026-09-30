@@ -17,9 +17,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthGate>
-          {(user, demo) => <Routes>
-            <Route path="/" element={<Index user={user} demo={demo} />} />
-            <Route path="/ia" element={<IA user={user} demo={demo} />} />
+          {(access) => <Routes>
+            <Route path="/" element={<Index access={access} />} />
+            <Route path="/ia" element={<IA access={access} />} />
             <Route path="*" element={<NotFound />} />
           </Routes>}
         </AuthGate>

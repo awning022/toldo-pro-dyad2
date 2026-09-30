@@ -1,0 +1,7 @@
+project_id = "toldo-pro-dyad2"
+
+[functions.assistant-chat]
+verify_jwt = true
+
+[functions.invite-employee]
+verify_jwt = true

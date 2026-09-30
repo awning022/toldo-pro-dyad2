@@ -1,9 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = "https://tsqcbdyddenplswmagqd.supabase.co";
-const supabasePublishableKey = "sb_publishable_OI8Ue4I0_JJZKD78LxHh1g_8khHcRfa";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const isSupabaseConfigured = true;
-export const supabase = createClient(supabaseUrl, supabasePublishableKey, {
-  auth: { persistSession: true, autoRefreshToken: true },
-});
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublishableKey);
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabasePublishableKey, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  })
+  : null;

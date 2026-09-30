@@ -1,7 +1,25 @@
 export type WorkflowRole = "Administrador" | "Vendas" | "Produção" | "Instalador" | "Financeiro";
-export type WorkflowPermission = "viewFinancial" | "approveQuote" | "convertClient" | "issueOS" | "sendProduction" | "changeProductionStatus" | "deleteRecord" | "editRules";
+export type WorkflowPermission =
+  | "viewFinancial"
+  | "approveQuote"
+  | "convertClient"
+  | "issueOS"
+  | "sendProduction"
+  | "changeProductionStatus"
+  | "deleteRecord"
+  | "editRules"
+  | "manageCustomers"
+  | "manageQuotes"
+  | "manageProduction"
+  | "manageStock"
+  | "requestMaterials"
+  | "manageInstallations"
+  | "manageFinance"
+  | "manageAgenda"
+  | "accessAssistant"
+  | "readNotifications";
 export type WorkflowQuoteStatus = "Rascunho" | "Enviado" | "Aprovado" | "Cancelado";
-export type ProductionStatus = "Aguardando produção" | "Em andamento" | "Parado" | "Pronto para instalar";
+export type ProductionStatus = "Aguardando produção" | "Em andamento" | "Parado" | "Pronto para instalar" | "Concluída";
 export type WorkflowHistory = { id: string; actor: string; role: WorkflowRole; at: string; action: string; from?: string; to?: string; origin: string };
 
 export type WorkflowQuote = {
@@ -76,6 +94,7 @@ export type WorkflowInstallation = {
   team: string;
   status: InstallationStatus;
   observations?: string;
+  materials?: string[];
   photos?: string[]; // base64 or URLs
   productionId?: string;
   osId?: string;
@@ -104,11 +123,11 @@ export type WorkflowProduction = {
 };
 
 export const workflowPermissions: Record<WorkflowRole, Record<WorkflowPermission, boolean>> = {
-  Administrador: { viewFinancial: true, approveQuote: true, convertClient: true, issueOS: true, sendProduction: true, changeProductionStatus: true, deleteRecord: true, editRules: true },
-  Vendas: { viewFinancial: true, approveQuote: true, convertClient: true, issueOS: true, sendProduction: false, changeProductionStatus: false, deleteRecord: false, editRules: false },
-  Produção: { viewFinancial: false, approveQuote: false, convertClient: false, issueOS: false, sendProduction: false, changeProductionStatus: true, deleteRecord: false, editRules: false },
-  Instalador: { viewFinancial: false, approveQuote: false, convertClient: false, issueOS: false, sendProduction: false, changeProductionStatus: false, deleteRecord: false, editRules: false },
-  Financeiro: { viewFinancial: true, approveQuote: false, convertClient: false, issueOS: false, sendProduction: false, changeProductionStatus: false, deleteRecord: false, editRules: false },
+  Administrador: { viewFinancial: true, approveQuote: true, convertClient: true, issueOS: true, sendProduction: true, changeProductionStatus: true, deleteRecord: true, editRules: true, manageCustomers: true, manageQuotes: true, manageProduction: true, manageStock: true, requestMaterials: true, manageInstallations: true, manageFinance: true, manageAgenda: true, accessAssistant: true, readNotifications: true },
+  Vendas: { viewFinancial: true, approveQuote: true, convertClient: true, issueOS: true, sendProduction: false, changeProductionStatus: false, deleteRecord: false, editRules: false, manageCustomers: true, manageQuotes: true, manageProduction: false, manageStock: false, requestMaterials: false, manageInstallations: false, manageFinance: false, manageAgenda: true, accessAssistant: true, readNotifications: true },
+  Produção: { viewFinancial: false, approveQuote: false, convertClient: false, issueOS: false, sendProduction: false, changeProductionStatus: true, deleteRecord: false, editRules: false, manageCustomers: false, manageQuotes: false, manageProduction: true, manageStock: true, requestMaterials: true, manageInstallations: true, manageFinance: false, manageAgenda: false, accessAssistant: true, readNotifications: true },
+  Instalador: { viewFinancial: false, approveQuote: false, convertClient: false, issueOS: false, sendProduction: false, changeProductionStatus: false, deleteRecord: false, editRules: false, manageCustomers: false, manageQuotes: false, manageProduction: false, manageStock: false, requestMaterials: true, manageInstallations: true, manageFinance: false, manageAgenda: false, accessAssistant: true, readNotifications: true },
+  Financeiro: { viewFinancial: true, approveQuote: false, convertClient: false, issueOS: false, sendProduction: false, changeProductionStatus: false, deleteRecord: false, editRules: false, manageCustomers: false, manageQuotes: false, manageProduction: false, manageStock: false, requestMaterials: false, manageInstallations: false, manageFinance: true, manageAgenda: false, accessAssistant: true, readNotifications: true },
 };
 
 export const permissionLabels: Record<WorkflowPermission, string> = {
@@ -120,7 +139,27 @@ export const permissionLabels: Record<WorkflowPermission, string> = {
   changeProductionStatus: "Alterar status crítico da produção",
   deleteRecord: "Excluir registros",
   editRules: "Alterar regras do sistema",
+  manageCustomers: "Consultar e gerenciar clientes",
+  manageQuotes: "Criar e editar orçamentos",
+  manageProduction: "Acessar a produção",
+  manageStock: "Gerenciar estoque e movimentações",
+  requestMaterials: "Solicitar materiais",
+  manageInstallations: "Acessar e finalizar instalações",
+  manageFinance: "Criar e editar contas financeiras",
+  manageAgenda: "Gerenciar agenda",
+  accessAssistant: "Usar a assistente Toldo Pro",
+  readNotifications: "Consultar notificações da empresa",
 };
+
+let activeRole: WorkflowRole = "Administrador";
+let activeActor = "Administrador";
+let activePermissions: Record<string, boolean> = {};
+
+export function setCurrentWorkflowActor(role: WorkflowRole, actor: string, permissions: Record<string, boolean> = {}) {
+  activeRole = role;
+  activeActor = actor || role;
+  activePermissions = permissions;
+}
 
 export const defaultWorkflowQuotes: WorkflowQuote[] = [
   {
@@ -161,12 +200,13 @@ export function writeWorkflowList<T>(key: string, value: T[]) {
 }
 
 export function getCurrentWorkflowRole(): WorkflowRole {
-  const role = window.localStorage.getItem("toldo:current-role");
-  return role === "Vendas" || role === "Produção" || role === "Instalador" || role === "Financeiro" ? role : "Administrador";
+  return activeRole;
 }
 
 export function canWorkflow(role: WorkflowRole, permission: WorkflowPermission) {
-  return workflowPermissions[role][permission];
+  return typeof activePermissions[permission] === "boolean"
+    ? activePermissions[permission]
+    : workflowPermissions[role][permission];
 }
 
 export function nowLabel() {
@@ -174,8 +214,7 @@ export function nowLabel() {
 }
 
 export function makeHistory(action: string, origin: string, from?: string, to?: string): WorkflowHistory {
-  const role = getCurrentWorkflowRole();
-  return { id: `history-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, actor: role === "Administrador" ? "Rafael Silva" : role, role, at: nowLabel(), action, from, to, origin };
+  return { id: `history-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, actor: activeActor, role: activeRole, at: nowLabel(), action, from, to, origin };
 }
 
 export function nextId(prefix: string, values: { id: string }[]) {
@@ -256,7 +295,7 @@ export function normalizeOS(raw: Partial<WorkflowOS> & { customer?: string; serv
 
 export function normalizeProduction(raw: Partial<WorkflowProduction> & { customer?: string; product?: string; owner?: string; due?: string; status?: string; priority?: string }, index: number): WorkflowProduction {
   const rawStatus = raw.status || "Aguardando produção";
-  const status: ProductionStatus = rawStatus === "Parado" ? "Parado" : rawStatus === "Pronto para instalar" ? "Pronto para instalar" : rawStatus === "Em andamento" ? "Em andamento" : "Aguardando produção";
+  const status: ProductionStatus = rawStatus === "Concluída" ? "Concluída" : rawStatus === "Parado" ? "Parado" : rawStatus === "Pronto para instalar" ? "Pronto para instalar" : rawStatus === "Em andamento" ? "Em andamento" : "Aguardando produção";
   return {
     id: raw.id || `OP-${String(84 + index).padStart(3, "0")}`,
     osId: raw.osId || "",
