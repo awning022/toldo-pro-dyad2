@@ -23,19 +23,33 @@ function AccessLoading({ children }: { children: ReactNode }) {
 
 function SetPassword({ onComplete }: { onComplete: () => void }) {
   const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!supabase) return;
+    if (password.length < 8) {
+      setError("A senha precisa ter pelo menos 8 caracteres.");
+      return;
+    }
+    if (password !== confirmation) {
+      setError("As senhas não conferem.");
+      return;
+    }
     setLoading(true);
     setError("");
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-    if (updateError) setError(updateError.message);
-    else onComplete();
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) setError("Não foi possível salvar a senha. Confira o link e tente novamente.");
+      else onComplete();
+    } catch {
+      setError("Não foi possível salvar a senha. Confira sua conexão e tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   };
-  return <div className="flex min-h-screen items-center justify-center bg-[#f5f7fa] p-5"><form onSubmit={submit} className="w-full max-w-[420px] rounded-3xl border border-[#e5ebf2] bg-white p-6 shadow-sm"><h1 className="text-xl font-extrabold text-[#17324d]">Defina sua senha</h1><p className="mt-2 text-sm leading-6 text-[#718398]">Crie sua senha pessoal para acessar o painel da empresa.</p><label className="mt-5 grid gap-2 text-xs font-bold text-[#52647d]">Nova senha<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} autoComplete="new-password" required className="h-11 rounded-xl border border-[#dbe3eb] px-3" /></label>{error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}<button disabled={loading} className="mt-5 h-11 w-full rounded-xl bg-[#f47b20] font-bold text-white disabled:opacity-50">{loading ? "Salvando..." : "Salvar senha e entrar"}</button></form></div>;
+  return <div className="flex min-h-screen items-center justify-center bg-[#f5f7fa] p-5"><form onSubmit={submit} className="w-full max-w-[420px] rounded-3xl border border-[#e5ebf2] bg-white p-6 shadow-sm"><h1 className="text-xl font-extrabold text-[#17324d]">Defina sua senha</h1><p className="mt-2 text-sm leading-6 text-[#718398]">Crie sua senha pessoal para acessar o painel da empresa.</p><label className="mt-5 grid gap-2 text-xs font-bold text-[#52647d]">Nova senha<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={8} autoComplete="new-password" required className="h-11 rounded-xl border border-[#dbe3eb] px-3" /></label><label className="mt-4 grid gap-2 text-xs font-bold text-[#52647d]">Confirme a senha<input type="password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} minLength={8} autoComplete="new-password" required className="h-11 rounded-xl border border-[#dbe3eb] px-3" /></label>{error && <p role="alert" className="mt-3 text-sm text-red-600">{error}</p>}<button disabled={loading} className="mt-5 h-11 w-full rounded-xl bg-[#f47b20] font-bold text-white disabled:opacity-50">{loading ? "Salvando..." : "Salvar senha e entrar"}</button></form></div>;
 }
 
 export function AuthGate({ children }: { children: (access: CompanyAccess) => ReactNode }) {
