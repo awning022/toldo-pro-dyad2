@@ -35,10 +35,11 @@ export function AuthScreen() {
       return;
     }
     try {
+      const normalizedEmail = email.trim().toLowerCase();
       const result = mode === "login"
-        ? await supabase.auth.signInWithPassword({ email, password })
+        ? await supabase.auth.signInWithPassword({ email: normalizedEmail, password })
         : await supabase.auth.signUp({
-          email,
+          email: normalizedEmail,
           password,
           options: {
             data: { full_name: name.trim(), phone: phone.trim(), company_name: companyName.trim() },
