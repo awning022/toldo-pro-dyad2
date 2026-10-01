@@ -47,7 +47,7 @@ import type { AssistantEvent } from "@/lib/operationalData";
 import type { CompanyAccess } from "@/lib/CompanyAccessContext";
 import type { WorkflowInstallation } from "@/lib/workflowData";
 import { useCompanyRecords } from "@/lib/useCompanyRecords";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabasePublishableKey } from "@/lib/supabase";
 import type { StockMaterial } from "@/lib/operationsStore";
 import type { FinanceEntry } from "@/components/FinanceView";
 import { toast } from "sonner";
@@ -218,11 +218,30 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
       text: message.text,
     }));
     try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        respond("Sua sessão expirou. Entre novamente para consultar a assistente.", "sistema");
+        return;
+      }
       const { data, error } = await supabase.functions.invoke<{ answer?: string; error?: string }>("assistant-chat", {
         body: { message: text, history },
+        headers: {
+          apikey: supabasePublishableKey,
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
       });
       if (error) {
-        respond("Não consegui consultar a IA agora. Verifique a configuração do serviço Gemini e tente novamente.", "sistema");
+        const errorContext = "context" in error ? error.context : null;
+        const status = errorContext instanceof Response ? errorContext.status : undefined;
+        const responseMessage = errorContext instanceof Response
+          ? await errorContext.clone().json().then((body: { error?: string }) => body.error).catch(() => undefined)
+          : undefined;
+        const userMessage = status === 401
+          ? "Sua sessão expirou. Entre novamente para consultar a assistente."
+          : status === 403
+            ? "Seu usuário não tem permissão para acessar a assistente."
+            : responseMessage || "Não consegui consultar a IA agora. Verifique a configuração do serviço Gemini e tente novamente.";
+        respond(userMessage, "sistema");
         toast.error("Falha ao consultar a assistente.", { description: error.message });
         return;
       }
