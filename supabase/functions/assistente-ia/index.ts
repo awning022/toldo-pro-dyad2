@@ -58,12 +58,14 @@ function requestedDomains(message: string, history: ChatTurn[]) {
     term === "os" ? /(?:^|[^a-z])os(?:$|[^a-z])/.test(current) : current.includes(term)
   ));
   if (matches.length) return matches;
-  const previousQuestion = [...history].reverse().find((turn) => turn.role === "user");
-  const previous = previousQuestion ? normalize(previousQuestion.text) : "";
-  const previousMatches = domainRules.filter((domain) => domain.terms.some((term) =>
-    term === "os" ? /(?:^|[^a-z])os(?:$|[^a-z])/.test(previous) : previous.includes(term)
-  ));
-  if (previousMatches.length) return previousMatches;
+  const previousUserTurns = history.filter((turn) => turn.role === "user").slice(-6).reverse();
+  for (const turn of previousUserTurns) {
+    const previous = normalize(turn.text);
+    const previousMatches = domainRules.filter((domain) => domain.terms.some((term) =>
+      term === "os" ? /(?:^|[^a-z])os(?:$|[^a-z])/.test(previous) : previous.includes(term)
+    ));
+    if (previousMatches.length) return previousMatches;
+  }
   if (/\b(resumo|panorama|situacao|operacao|empresa|pendencias|prioridades)\b/.test(current)) {
     return domainRules.filter((domain) => domain.id !== "finance");
   }
@@ -118,7 +120,7 @@ Deno.serve(async (request) => {
   if (!message || message.length > 8000) return json(400, { error: "Message must contain between 1 and 8000 characters" });
   const history = (Array.isArray(body.history) ? body.history : [])
     .filter((turn): turn is ChatTurn => turn && (turn.role === "user" || turn.role === "model") && typeof turn.text === "string")
-    .slice(-8)
+    .slice(-12)
     .map((turn) => ({ role: turn.role, parts: [{ text: turn.text.slice(0, 2000) }] }));
 
   const [{ data: companyId, error: companyError }, { data: membership, error: membershipError }] = await Promise.all([
@@ -128,8 +130,8 @@ Deno.serve(async (request) => {
   if (companyError || !companyId) return json(403, { error: "Active company membership required" });
   if (membershipError || !membership || membership.company_id !== companyId) return json(403, { error: "Unable to confirm active company membership" });
 
-  const rawHistory = Array.isArray(body.history) ? body.history.filter((turn): turn is ChatTurn => turn && (turn.role === "user" || turn.role === "model") && typeof turn.text === "string").slice(-8) : [];
-  const searchContext = [...rawHistory.filter((turn) => turn.role === "user").slice(-2).map((turn) => turn.text), message].join(" ").slice(0, 1000);
+  const rawHistory = Array.isArray(body.history) ? body.history.filter((turn): turn is ChatTurn => turn && (turn.role === "user" || turn.role === "model") && typeof turn.text === "string").slice(-12) : [];
+  const searchContext = [...rawHistory.filter((turn) => turn.role === "user").slice(-4).map((turn) => turn.text), message].join(" ").slice(0, 1000);
   const domains = requestedDomains(message, rawHistory);
   const permissionsNeeded = [...new Set(domains.flatMap((domain) => domain.permissions))];
   const permissionResults = await Promise.all(permissionsNeeded.map(async (permission) => {
@@ -200,7 +202,11 @@ Deno.serve(async (request) => {
                 "Nunca deduza ou revele informações de outra empresa ou campos financeiros ausentes. Se não houver dados suficientes ou acesso, explique isso e peça contexto.",
                 "Mantenha o contexto das últimas mensagens e use os registros correspondentes ao assunto atual. Para perguntas de acompanhamento, interprete referências como 'esse pedido' com base na conversa; se houver mais de uma possibilidade, pergunte qual. Não invente registros, prazos, valores nem status.",
                 "Você não executa gravações. Para ações como criar ou editar registros, explique o que falta e peça confirmação antes de orientar a operação no painel.",
-                `Áreas consultadas nesta resposta: ${permittedDomains.map((domain) => domain.id).join(", ") || "nenhuma; informe que seu cargo não tem acesso a essa área"}.`,
+                permittedDomains.length
+                  ? `Áreas consultadas nesta resposta: ${permittedDomains.map((domain) => domain.id).join(", ")}.`
+                  : domains.length
+                    ? "O usuário pediu uma área sem permissão disponível. Informe com clareza que não tem acesso aos dados solicitados e não tente inferi-los."
+                    : "Esta é uma conversa geral ou uma continuação sem consulta operacional identificada. Responda naturalmente usando o histórico da conversa. Não afirme que o usuário não tem permissão nem que dados foram consultados.",
                 `Dados operacionais permitidos (JSON): ${JSON.stringify({ records, privateRecords })}`,
               ].join(" "),
             }],
