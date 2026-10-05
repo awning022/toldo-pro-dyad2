@@ -19,7 +19,7 @@ Application for managing customers, quotes, work orders, production, installatio
 
    ```sh
    supabase functions deploy invite-employee
-   supabase functions deploy assistant-chat
+   supabase functions deploy assistente-ia
    ```
 
    Supabase provides the standard `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` function secrets. Edge Functions use the Deno `supabase-js` import directly, so no Node server package is required. `APP_URL` is used in employee invitation links.
