@@ -181,7 +181,7 @@ function AgentView() {
 }
 
 export function ModuleView({ module, onModuleChange }: ModuleViewProps) {
-  if (module === "vendas") return <WorkflowView module="clientes" onModuleChange={onModuleChange} />;
+  if (module === "vendas") return <SalesView />;
   if (module === "clientes" || module === "orcamentos" || module === "os" || module === "operacao" || module === "equipe" || module === "gestao") return <WorkflowView module={module} onModuleChange={onModuleChange} />;
   if (module === "agenda" || module === "notificacoes" || module === "financeiro" || module === "relatorios" || module === "configuracoes") return <OperationalView module={module} onModuleChange={onModuleChange} />;
   if (module === "estoque") return <InventoryView />;
