@@ -55,7 +55,8 @@ const navGroups = [
     { label: "Notificações", module: "notificacoes" as ModuleKey, count: 4, icon: Bell },
   ] },
   { label: "Operação", items: [
-    { label: "Clientes e CRM", module: "clientes" as ModuleKey, icon: Users },
+    { label: "CRM", module: "vendas" as ModuleKey, icon: Users },
+    { label: "Clientes", module: "clientes" as ModuleKey, icon: UserRound },
     { label: "Contatos e vendas", module: "vendas" as ModuleKey, count: 12, icon: BarChart3 },
     { label: "Orçamentos", module: "orcamentos" as ModuleKey, icon: FileText },
     { label: "Emitir OS", module: "os" as ModuleKey, icon: ClipboardList },
