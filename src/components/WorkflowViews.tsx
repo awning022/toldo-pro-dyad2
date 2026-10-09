@@ -190,6 +190,10 @@ function WorkflowQuotesView({ onModuleChange }: WorkflowViewProps) {
     toast.info("OS selecionada. Confirme o envio na tela de OS.");
   };
   const saveQuote = (draft: QuoteDraft) => {
+    if (!String(draft.customerName || "").trim() || !String(draft.productModel || "").trim() || !String(draft.measurements || "").trim() || !String(draft.finalValue || "").trim() || !String(draft.validUntil || "").trim()) {
+      toast.error("Preencha cliente, modelo do toldo, medidas, valor final e validade antes de salvar.");
+      return;
+    }
     if (form === "edit" && selected) {
       setQuotes((current) => current.map((item) => item.id === selected.id ? { ...item, ...draft, history: [...item.history, makeHistory("Orçamento editado", "Tela de Orçamentos")] } : item));
       toast.success("Orçamento atualizado");
@@ -299,7 +303,7 @@ function printWorkOrder(order: WorkflowOS) {
       <div class="field"><span class="label">Quantidade · Cor · Acabamento</span>${order.quantity} · ${escape(order.color)} · ${escape(order.finish)}</div>
     </div><h2>Observações</h2><div class="field notes">${escape(order.notes || "—")}</div>
     <div class="signature"><div>Assinatura do cliente</div><div>Responsável pelo serviço</div></div>
-    <script>window.addEventListener("load",()=>window.print());</script></body></html>`);
+    <script>setTimeout(()=>{window.focus();window.print()},300);</script></body></html>`);
   popup.document.close();
 }
 
