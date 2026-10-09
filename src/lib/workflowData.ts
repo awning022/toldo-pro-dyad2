@@ -56,7 +56,7 @@ export type WorkflowClient = {
   city: string;
   taxId: string;
   notes: string;
-  source: "convertido de orçamento";
+  source: "convertido de orçamento" | "cadastro manual";
   sourceQuoteId: string;
   product: string;
   quoteId: string;
