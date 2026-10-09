@@ -317,7 +317,7 @@ function WorkflowOSView({ onModuleChange }: WorkflowViewProps) {
   const [chooseQuote, setChooseQuote] = useState(false);
   const { setConfirmation, modal } = useConfirm();
   const eligible = quotes.filter((quote) => quote.status === "Aprovado" && !quote.osId && clients.some((client) => client.id === quote.clientId || client.sourceQuoteId === quote.id || client.quoteId === quote.id || (client.name === quote.customerName && !client.sourceQuoteId && !client.quoteId)));
-  const selected = orders.find((order) => order.id === selectedId) || orders[0];
+  const selected = orders.find((order) => order.id === selectedId);
   const activeOrders = orders.filter((order) => order.status !== "Concluída");
   const completedOrders = orders.filter((order) => order.status === "Concluída");
   const issueFromQuote = (quote: WorkflowQuote) => {
