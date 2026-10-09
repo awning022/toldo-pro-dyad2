@@ -36,3 +36,30 @@ input {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #d7e0ea; border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background: #b8c6d6; }
+
+/* Refinamentos de interface: resposta visual consistente e acessível. */
+::selection { background: rgba(244, 123, 32, 0.18); color: #172b4d; }
+
+button, a, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid rgba(244, 123, 32, 0.45);
+  outline-offset: 2px;
+}
+
+button {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 160ms;
+  transition-timing-function: ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
