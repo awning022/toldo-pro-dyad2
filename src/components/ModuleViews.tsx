@@ -44,6 +44,7 @@ import { WorkflowView } from "@/components/WorkflowViews";
 import { InventoryView } from "@/components/InventoryView";
 import { InstallationsView as WorkflowInstallationsView } from "@/components/InstallationsView";
 import { toast } from "sonner";
+import { useCompanyRecords } from "@/lib/useCompanyRecords";
 
 export type ModuleKey = "painel" | "agenda" | "notificacoes" | "clientes" | "vendas" | "orcamentos" | "os" | "operacao" | "estoque" | "instalacoes" | "financeiro" | "relatorios" | "equipe" | "gestao" | "agente" | "configuracoes";
 type ModuleViewProps = { module: ModuleKey; onModuleChange: (module: ModuleKey) => void };
