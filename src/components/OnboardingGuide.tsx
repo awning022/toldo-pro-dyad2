@@ -61,6 +61,12 @@ export function OnboardingGuide({ userKey, onNavigate }: Props) {
     }
   }, [userKey]);
 
+  useEffect(() => {
+    const reopen = () => { setLessonIndex(0); setStepIndex(0); };
+    window.addEventListener("toldo-pro:open-guide", reopen);
+    return () => window.removeEventListener("toldo-pro:open-guide", reopen);
+  }, []);
+
   if (lessonIndex === null) return null;
   const lesson = lessons[lessonIndex];
   const step = lesson.steps[stepIndex];
