@@ -233,8 +233,8 @@ function WorkflowClientsView({ onModuleChange }: WorkflowViewProps) {
     const order = orders.find((entry) => entry.id === item.osId || entry.clientId === item.id);
     const quote = quotes.find((entry) => entry.id === item.quoteId || entry.id === item.sourceQuoteId);
     const searchText = `${item.name} ${item.phone} ${item.taxId} ${item.email} ${order?.id || ""} ${order?.quoteId || ""} ${quote?.id || ""}`.toLocaleLowerCase();
-    const digits = query.replace(/\\D/g, "");
-    return searchText.includes(query.toLocaleLowerCase()) || Boolean(digits && `${item.phone} ${item.taxId}`.replace(/\\D/g, "").includes(digits));
+    const digits = query.replace(/\D/g, "");
+    return searchText.includes(query.toLocaleLowerCase()) || Boolean(digits && `${item.phone} ${item.taxId}`.replace(/\D/g, "").includes(digits));
   });
   const [selectedId, setSelectedId] = useState<string | null>(clients[0]?.id || null);
   const client = filteredClients.find((item) => item.id === selectedId) || filteredClients[0];
@@ -245,7 +245,7 @@ function WorkflowClientsView({ onModuleChange }: WorkflowViewProps) {
     const name = String(draft.name || "").trim();
     const phone = String(draft.phone || "").trim();
     if (!name || !phone) return toast.error("Informe o nome e o telefone do cliente.");
-    const digits = String(draft.taxId || "").replace(/\\D/g, "");
+    const digits = String(draft.taxId || "").replace(/\D/g, "");
     if (digits && digits.length !== 11 && digits.length !== 14) return toast.error("CPF deve ter 11 dígitos ou CNPJ 14 dígitos.");
     if (editing) {
       setClients((current) => current.map((item) => item.id === editing.id ? { ...item, ...draft, name, phone, history: [...item.history, makeHistory("Cadastro do cliente editado", "Tela de Clientes")] } : item));
