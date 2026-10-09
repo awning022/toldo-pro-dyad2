@@ -27,7 +27,6 @@ import {
   Search,
   Settings2,
   Settings,
-  Sparkles,
   Truck,
   UserRound,
   Users,
@@ -39,6 +38,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModuleView, type ModuleKey } from "@/components/ModuleViews";
+import { OnboardingGuide } from "@/components/OnboardingGuide";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import type { WorkflowRole } from "@/lib/workflowData";
@@ -55,7 +55,8 @@ const navGroups = [
     { label: "Notificações", module: "notificacoes" as ModuleKey, count: 4, icon: Bell },
   ] },
   { label: "Operação", items: [
-    { label: "Clientes e CRM", module: "clientes" as ModuleKey, icon: Users },
+    { label: "CRM", module: "vendas" as ModuleKey, icon: Users },
+    { label: "Clientes", module: "clientes" as ModuleKey, icon: UserRound },
     { label: "Contatos e vendas", module: "vendas" as ModuleKey, count: 12, icon: BarChart3 },
     { label: "Orçamentos", module: "orcamentos" as ModuleKey, icon: FileText },
     { label: "Emitir OS", module: "os" as ModuleKey, icon: ClipboardList },
@@ -66,10 +67,8 @@ const navGroups = [
   { label: "Gestão", items: [
     { label: "Financeiro", module: "financeiro" as ModuleKey, icon: Wallet },
     { label: "Relatórios", module: "relatorios" as ModuleKey, icon: FileBarChart },
-    { label: "Equipe e permissões", module: "equipe" as ModuleKey, icon: UserRound },
   ] },
   { label: "Tecnologia", items: [
-    { label: "Agente Toldo Pro IA", module: "agente" as ModuleKey, count: 3, icon: Sparkles },
     { label: "Configurações", module: "configuracoes" as ModuleKey, icon: Settings },
   ] },
 ];
@@ -150,8 +149,6 @@ function accessibleModules(access: CompanyAccess): ModuleKey[] {
     ["estoque", access.can("manageStock") || access.can("requestMaterials")],
     ["financeiro", access.can("viewFinancial")],
     ["relatorios", access.can("viewFinancial") || access.can("manageCustomers") || access.can("manageProduction")],
-    ["equipe", access.can("editRules")],
-    ["agente", access.can("accessAssistant")],
     ["configuracoes", access.can("editRules")],
   ] as const;
   allowed.forEach(([module, enabled]) => { if (enabled) modules.push(module); });
@@ -171,10 +168,9 @@ export default function Index({ access }: { access: CompanyAccess }) {
   const userName = access.fullName.split(" ")[0] || access.email;
   const signOut = async () => { await supabase?.auth.signOut(); };
   const navigate = (module: ModuleKey) => {
-    if (module === "agente") { window.location.assign("/ia"); return; }
     if (!modules.includes(module)) return toast.error("Sua conta não tem permissão para acessar essa área.");
     setActive(module);
   };
 
-  return <div className="min-h-screen bg-[#f5f7fa] text-[#172b4d]"><div className="flex min-h-screen"><Sidebar active={active} onNavigate={navigate} open={menuOpen} onClose={() => setMenuOpen(false)} role={access.role} name={userName} companyName={access.companyName} modules={modules} /><main className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#e9edf3] bg-[#f5f7fa]/95 px-4 backdrop-blur-md sm:px-6 lg:px-9"><div className="flex items-center gap-3"><button onClick={() => setMenuOpen(true)} className="rounded-xl border border-[#e1e7ef] bg-white p-2 text-[#52647d] shadow-sm lg:hidden" aria-label="Abrir menu"><Menu size={19} /></button><div className="flex items-center gap-2 text-[11px] font-semibold text-[#90a0b2]"><Building2 size={15} className="text-[#f47b20]" /> {access.companyName} <ChevronRight size={13} /><span className="text-[#52647d]">{access.role}</span></div></div><div className="flex items-center gap-2">{access.can("accessAssistant") && <button onClick={() => navigate("agente")} className="flex items-center gap-2 rounded-xl bg-[#fff1e7] px-3 py-2 text-[10px] font-bold text-[#d9620d]"><Sparkles size={14} /> Abrir agente</button>}{modules.includes("notificacoes") && <button onClick={() => navigate("notificacoes")} className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-[#e1e7ef] bg-white text-[#708096] shadow-sm" aria-label="Notificações"><Bell size={17} /></button>}<button onClick={() => navigateTo("/auth/change-email")} title="Alterar e-mail" aria-label="Alterar e-mail" className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#e1e7ef] bg-white text-[#52647d] shadow-sm"><Mail size={16} /></button><button onClick={signOut} className="flex h-9 items-center gap-2 rounded-xl border border-[#e1e7ef] bg-white px-2 shadow-sm"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#e4b89c] text-[9px] font-bold text-[#6d3e2a]">{userName.slice(0, 2).toUpperCase()}</span><span className="hidden max-w-[90px] truncate text-[10px] font-bold text-[#52647d] sm:inline">{userName}</span></button></div></header><div className="mx-auto max-w-[1480px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">{active === "painel" ? <DashboardView onModuleChange={navigate} access={access} /> : <ModuleView module={active} onModuleChange={navigate} />}<footer className="mt-8 flex flex-col justify-between gap-2 border-t border-[#e5eaf0] pt-5 text-[10px] font-medium text-[#9aa6b6] sm:flex-row"><span>© 2026 Toldo Pro · Dados isolados por empresa</span><span className="flex items-center gap-1.5"><CircleHelp size={12} /> Central de ajuda <span className="mx-1">·</span> Termos e privacidade</span></footer></div></main></div></div>;
+  return <div className="min-h-screen bg-[#f5f7fa] text-[#172b4d]"><OnboardingGuide userKey={access.email || `${access.fullName}:${access.companyId || access.companyName}`} onNavigate={navigate} /><div className="flex min-h-screen"><Sidebar active={active} onNavigate={navigate} open={menuOpen} onClose={() => setMenuOpen(false)} role={access.role} name={userName} companyName={access.companyName} modules={modules} /><main className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#e9edf3] bg-[#f5f7fa]/95 px-4 backdrop-blur-md sm:px-6 lg:px-9"><div className="flex items-center gap-3"><button onClick={() => setMenuOpen(true)} className="rounded-xl border border-[#e1e7ef] bg-white p-2 text-[#52647d] shadow-sm lg:hidden" aria-label="Abrir menu"><Menu size={19} /></button><div className="flex items-center gap-2 text-[11px] font-semibold text-[#90a0b2]"><Building2 size={15} className="text-[#f47b20]" /> {access.companyName} <ChevronRight size={13} /><span className="text-[#52647d]">{access.role}</span></div></div><div className="flex items-center gap-2"><button onClick={() => window.dispatchEvent(new Event("toldo-pro:open-guide"))} title="Abrir guia de uso" aria-label="Abrir guia de uso" className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#e1e7ef] bg-white text-[#52647d] shadow-sm transition hover:border-[#f4b17e] hover:text-[#d9620d]"><CircleHelp size={17} /></button>{modules.includes("notificacoes") && <button onClick={() => navigate("notificacoes")} className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-[#e1e7ef] bg-white text-[#708096] shadow-sm" aria-label="Notificações"><Bell size={17} /></button>}<button onClick={() => navigateTo("/auth/change-email")} title="Alterar e-mail" aria-label="Alterar e-mail" className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#e1e7ef] bg-white text-[#52647d] shadow-sm"><Mail size={16} /></button><button onClick={signOut} className="flex h-9 items-center gap-2 rounded-xl border border-[#e1e7ef] bg-white px-2 shadow-sm"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#e4b89c] text-[9px] font-bold text-[#6d3e2a]">{userName.slice(0, 2).toUpperCase()}</span><span className="hidden max-w-[90px] truncate text-[10px] font-bold text-[#52647d] sm:inline">{userName}</span></button></div></header><div className="mx-auto max-w-[1480px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">{active === "painel" ? <DashboardView onModuleChange={navigate} access={access} /> : <ModuleView module={active} onModuleChange={navigate} />}<footer className="mt-8 flex flex-col justify-between gap-2 border-t border-[#e5eaf0] pt-5 text-[10px] font-medium text-[#9aa6b6] sm:flex-row"><span>© 2026 Toldo Pro · Dados isolados por empresa</span><span className="flex items-center gap-1.5"><CircleHelp size={12} /> Central de ajuda <span className="mx-1">·</span> Termos e privacidade</span></footer></div></main></div></div>;
 }
