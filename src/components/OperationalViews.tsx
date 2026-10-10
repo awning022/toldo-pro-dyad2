@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   Bell,
@@ -35,6 +35,7 @@ import { FinanceView } from "@/components/FinanceView";
 import type { AppNotification } from "@/lib/operationsStore";
 import { useCompanyRecords } from "@/lib/useCompanyRecords";
 import { useCompanyAccess } from "@/lib/CompanyAccessContext";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 type OperationalModule = "agenda" | "notificacoes" | "os" | "financeiro" | "relatorios" | "configuracoes";
@@ -102,10 +103,90 @@ function ReportsModule() {
 }
 
 function SettingsModule() {
+  const access = useCompanyAccess();
   const [settings, setSettings] = useState({ dark: false, camera: true, gps: true, pwa: true, sync: true, notifications: true });
+  const [editOpen, setEditOpen] = useState(false);
+  const [savingCompany, setSavingCompany] = useState(false);
+  const [loadingCompany, setLoadingCompany] = useState(false);
+  const [companyForm, setCompanyForm] = useState({
+    trade_name: "", legal_name: "", document: "", phone: "", whatsapp: "", email: "",
+    street: "", number: "", complement: "", neighborhood: "", city: "", state: "", postal_code: "",
+  });
   const toggle = (key: keyof typeof settings) => setSettings((current) => ({ ...current, [key]: !current[key] }));
   const rows: { key: keyof typeof settings; label: string; helper: string; icon: LucideIcon }[] = [{ key: "dark", label: "Tema escuro", helper: "Use o Toldo Pro com menos brilho em campo.", icon: SlidersHorizontal }, { key: "camera", label: "Câmera", helper: "Permitir fotos para medições e instalações.", icon: Wrench }, { key: "gps", label: "Localização", helper: "Apoiar equipes com endereço e chegada.", icon: MapPin }, { key: "pwa", label: "Aplicativo instalado", helper: "Manter o acesso rápido na tela inicial.", icon: Download }, { key: "sync", label: "Sincronização automática", helper: "Enviar pendências assim que houver conexão.", icon: CalendarRange }, { key: "notifications", label: "Notificações", helper: "Receber alertas de clientes e operação.", icon: Bell }];
-  return <div><PageHeader eyebrow="Sistema" title="Configurações" description="Ajuste a experiência do Toldo Pro para o escritório e para as equipes de campo." /><div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_.9fr]"><div className={`${shell} overflow-hidden`}><div className="border-b border-[#eef1f5] p-5"><h2 className="font-display text-[16px] font-extrabold text-[#17324d]">Preferências do aplicativo</h2><p className="mt-1 text-[11px] text-[#8d9aaa]">As escolhas ficam vinculadas ao usuário atual.</p></div><div className="divide-y divide-[#eef1f5]">{rows.map((row) => { const Icon = row.icon; return <div key={row.key} className="flex items-center gap-3 p-4 sm:p-5"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eaf2ff] text-[#2859a6]"><Icon size={17} /></div><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-[#344861]">{row.label}</p><p className="mt-1 text-[10px] leading-4 text-[#9aa6b6]">{row.helper}</p></div><button onClick={() => toggle(row.key)} className={`relative h-6 w-11 rounded-full transition ${settings[row.key] ? "bg-[#f47b20]" : "bg-[#d4dce5]"}`} aria-label={`Alternar ${row.label}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${settings[row.key] ? "left-6" : "left-1"}`} /></button></div>; })}</div></div><div className="space-y-5"><div className="rounded-[22px] bg-[#17324d] p-5 text-white shadow-[0_12px_28px_rgba(23,50,77,0.14)]"><div className="flex items-center gap-2 text-[#9fb6cd]"><ShieldCheck size={17} /><span className="text-[10px] font-extrabold uppercase tracking-[0.14em]">Empresa e segurança</span></div><h2 className="mt-4 font-display text-[19px] font-extrabold">Toldos Silva & Cia</h2><p className="mt-2 text-[11px] leading-5 text-[#b2c3d4]">CNPJ 12.345.678/0001-90 · São Paulo, SP</p><Button onClick={() => toast.info("Dados da empresa disponíveis para edição")} className="mt-5 h-10 w-full rounded-xl bg-white/10 text-[10px] font-bold text-white hover:bg-white/15">Editar dados da empresa</Button></div><div className={`${shell} p-5`}><div className="flex items-center gap-2"><Settings size={17} className="text-[#f47b20]" /><h2 className="font-display text-[16px] font-extrabold text-[#17324d]">Agente Toldo Pro IA</h2></div><p className="mt-2 text-[11px] leading-5 text-[#8d9aaa]">A assistente usa a sessão, empresa e permissões atuais. Não existe um banco separado.</p><button onClick={() => toast.success("Preferências da IA atualizadas")} className="mt-4 flex w-full items-center justify-between rounded-xl bg-[#f3f7fd] px-3 py-2.5 text-[10px] font-extrabold text-[#2859a6]">Gerenciar preferências <ChevronRight size={14} /></button></div></div></div></div>;
+
+  const openCompanyEditor = async () => {
+    if (!supabase) {
+      toast.error("O acesso ao banco de dados não está configurado.");
+      return;
+    }
+    setLoadingCompany(true);
+    setEditOpen(true);
+    const { data, error } = await supabase.from("companies")
+      .select("trade_name, legal_name, document, phone, whatsapp, email, address")
+      .eq("id", access.companyId).maybeSingle();
+    if (error || !data) {
+      toast.error("Não foi possível carregar os dados da empresa.", { description: error?.message });
+      setLoadingCompany(false);
+      return;
+    }
+    const address = data.address && typeof data.address === "object" ? data.address as Record<string, unknown> : {};
+    setCompanyForm({
+      trade_name: data.trade_name || "", legal_name: data.legal_name || "", document: data.document || "",
+      phone: data.phone || "", whatsapp: data.whatsapp || "", email: data.email || "",
+      street: String(address.street || address.logradouro || ""), number: String(address.number || address.numero || ""),
+      complement: String(address.complement || address.complemento || ""), neighborhood: String(address.neighborhood || address.bairro || ""),
+      city: String(address.city || address.cidade || ""), state: String(address.state || address.uf || ""),
+      postal_code: String(address.postal_code || address.cep || ""),
+    });
+    setLoadingCompany(false);
+  };
+
+  const saveCompany = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase || savingCompany) return;
+    if (!access.can("manageCompany") && !["admin", "administrador", "owner", "proprietario", "proprietário"].includes(String(access.role).toLowerCase())) {
+      toast.error("Seu perfil não tem permissão para editar os dados da empresa.");
+      return;
+    }
+    setSavingCompany(true);
+    const address = {
+      street: companyForm.street.trim(), number: companyForm.number.trim(), complement: companyForm.complement.trim(),
+      neighborhood: companyForm.neighborhood.trim(), city: companyForm.city.trim(), state: companyForm.state.trim().toUpperCase(),
+      postal_code: companyForm.postal_code.trim(),
+    };
+    const { error } = await supabase.from("companies").update({
+      trade_name: companyForm.trade_name.trim(), legal_name: companyForm.legal_name.trim(),
+      document: companyForm.document.trim() || null, phone: companyForm.phone.trim() || null,
+      whatsapp: companyForm.whatsapp.trim() || null, email: companyForm.email.trim() || null, address,
+      updated_at: new Date().toISOString(),
+    }).eq("id", access.companyId);
+    setSavingCompany(false);
+    if (error) {
+      toast.error("Não foi possível salvar os dados da empresa.", { description: error.message });
+      return;
+    }
+    toast.success("Dados da empresa atualizados.");
+    setEditOpen(false);
+    await access.reloadMemberships();
+  };
+
+  const setCompanyField = (field: keyof typeof companyForm, value: string) => setCompanyForm((current) => ({ ...current, [field]: value }));
+  const companyFields: { id: keyof typeof companyForm; label: string; type?: string; required?: boolean }[] = [
+    { id: "trade_name", label: "Nome fantasia", required: true }, { id: "legal_name", label: "Razão social", required: true },
+    { id: "document", label: "CNPJ" }, { id: "phone", label: "Telefone" }, { id: "whatsapp", label: "WhatsApp" },
+    { id: "email", label: "E-mail", type: "email" }, { id: "street", label: "Rua / logradouro" }, { id: "number", label: "Número" },
+    { id: "complement", label: "Complemento" }, { id: "neighborhood", label: "Bairro" }, { id: "city", label: "Cidade" },
+    { id: "state", label: "UF" }, { id: "postal_code", label: "CEP" },
+  ];
+  return <div>
+    <PageHeader eyebrow="Sistema" title="Configurações" description="Ajuste a experiência do Toldo Pro para o escritório e para as equipes de campo." />
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_.9fr]">
+      <div className={`${shell} overflow-hidden`}><div className="border-b border-[#eef1f5] p-5"><h2 className="font-display text-[16px] font-extrabold text-[#17324d]">Preferências do aplicativo</h2><p className="mt-1 text-[11px] text-[#8d9aaa]">As escolhas ficam vinculadas ao usuário atual.</p></div><div className="divide-y divide-[#eef1f5]">{rows.map((row) => { const Icon = row.icon; return <div key={row.key} className="flex items-center gap-3 p-4 sm:p-5"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eaf2ff] text-[#2859a6]"><Icon size={17} /></div><div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-[#344861]">{row.label}</p><p className="mt-1 text-[10px] leading-4 text-[#9aa6b6]">{row.helper}</p></div><button onClick={() => toggle(row.key)} className={`relative h-6 w-11 rounded-full transition ${settings[row.key] ? "bg-[#f47b20]" : "bg-[#d4dce5]"}`} aria-label={`Alternar ${row.label}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${settings[row.key] ? "left-6" : "left-1"}`} /></button></div>; })}</div></div>
+      <div className="space-y-5"><div className="rounded-[22px] bg-[#17324d] p-5 text-white shadow-[0_12px_28px_rgba(23,50,77,0.14)]"><div className="flex items-center gap-2 text-[#9fb6cd]"><ShieldCheck size={17} /><span className="text-[10px] font-extrabold uppercase tracking-[0.14em]">Empresa e segurança</span></div><h2 className="mt-4 font-display text-[19px] font-extrabold">{access.companyName || "Sua empresa"}</h2><p className="mt-2 text-[11px] leading-5 text-[#b2c3d4]">Edite o cadastro da empresa, contatos e endereço.</p><Button onClick={openCompanyEditor} className="mt-5 h-10 w-full rounded-xl bg-white/10 text-[10px] font-bold text-white hover:bg-white/15">Editar dados da empresa</Button></div><div className={`${shell} p-5`}><div className="flex items-center gap-2"><Settings size={17} className="text-[#f47b20]" /><h2 className="font-display text-[16px] font-extrabold text-[#17324d]">Agente Toldo Pro IA</h2></div><p className="mt-2 text-[11px] leading-5 text-[#8d9aaa]">A assistente usa a sessão, empresa e permissões atuais. Não existe um banco separado.</p><button onClick={() => toast.success("Preferências da IA atualizadas")} className="mt-4 flex w-full items-center justify-between rounded-xl bg-[#f3f7fd] px-3 py-2.5 text-[10px] font-extrabold text-[#2859a6]">Gerenciar preferências <ChevronRight size={14} /></button></div></div>
+    </div>
+    {editOpen && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#10243a]/60 p-3 sm:p-6" role="dialog" aria-modal="true" aria-labelledby="company-edit-title"><form onSubmit={saveCompany} className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-7"><div className="mb-5 flex items-start justify-between gap-4"><div><h2 id="company-edit-title" className="text-lg font-extrabold text-[#17324d]">Editar dados da empresa</h2><p className="mt-1 text-sm text-[#718096]">As alterações serão salvas no cadastro desta empresa.</p></div><button type="button" onClick={() => setEditOpen(false)} className="rounded-lg p-2 text-[#718096] hover:bg-slate-100" aria-label="Fechar"><X size={18} /></button></div>{loadingCompany ? <p className="py-10 text-center text-sm text-slate-500">Carregando dados da empresa...</p> : <><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{companyFields.map((field) => <label key={field.id} className="block"><span className="mb-1.5 block text-xs font-bold text-[#344861]">{field.label}</span><Input value={companyForm[field.id]} onChange={(e) => setCompanyField(field.id, e.target.value)} type={field.type || "text"} required={field.required} maxLength={field.id === "state" ? 2 : undefined} className="h-10 rounded-xl" /></label>)}</div><div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><Button type="button" variant="outline" onClick={() => setEditOpen(false)} className="rounded-xl">Cancelar</Button><Button type="submit" disabled={savingCompany} className="rounded-xl bg-[#f47b20] text-white hover:bg-[#df6a13]">{savingCompany ? "Salvando..." : "Salvar alterações"}</Button></div></>}</form></div>}
+  </div>;
 }
 
 export function OperationalView({ module, onModuleChange }: { module: OperationalModule; onModuleChange: (module: ModuleKey) => void }) {
