@@ -145,7 +145,7 @@ function SettingsModule() {
   const saveCompany = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!supabase || savingCompany) return;
-    if (!access.can("manageCompany") && !["admin", "administrador", "owner", "proprietario", "proprietário"].includes(String(access.role).toLowerCase())) {
+    if (!["admin", "administrador", "owner", "proprietario", "proprietário"].includes(String(access.role).toLowerCase())) {
       toast.error("Seu perfil não tem permissão para editar os dados da empresa.");
       return;
     }
