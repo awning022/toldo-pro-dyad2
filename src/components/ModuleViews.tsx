@@ -45,8 +45,9 @@ import { InventoryView } from "@/components/InventoryView";
 import { InstallationsView as WorkflowInstallationsView } from "@/components/InstallationsView";
 import { toast } from "sonner";
 import { useCompanyRecords } from "@/lib/useCompanyRecords";
+import type { WorkflowQuote } from "@/lib/workflowData";
 
-export type ModuleKey = "painel" | "agenda" | "notificacoes" | "clientes" | "vendas" | "orcamentos" | "os" | "operacao" | "estoque" | "instalacoes" | "financeiro" | "relatorios" | "equipe" | "gestao" | "agente" | "configuracoes";
+export type ModuleKey = "painel" | "agenda" | "notificacoes" | "crm" | "clientes" | "vendas" | "orcamentos" | "os" | "operacao" | "estoque" | "instalacoes" | "financeiro" | "relatorios" | "equipe" | "gestao" | "agente" | "configuracoes";
 type ModuleViewProps = { module: ModuleKey; onModuleChange: (module: ModuleKey) => void };
 type StatCardProps = { label: string; value: string; helper: string; icon: LucideIcon; tone: string };
 type Field = { id: string; label: string; placeholder: string; type?: string; required?: boolean };
@@ -112,6 +113,57 @@ function CustomersView() {
   const [open, setOpen] = useState(false);
   const filtered = useMemo(() => customers.filter((item) => `${item.name} ${item.contact}`.toLowerCase().includes(query.toLowerCase())), [customers, query]);
   return <div><PageHeading eyebrow="Relacionamento" title="Clientes e CRM" description="Uma visão completa de clientes, contatos e histórico comercial." action="Novo cliente" onAction={() => setOpen(true)} /><div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3"><StatCard label="Clientes ativos" value={String(customers.length)} helper="salvos neste dispositivo" icon={Users} tone="bg-[#eaf2ff] text-[#1453a6]" /><StatCard label="Contatos em negociação" value="38" helper="R$ 142.650 no funil" icon={MessageSquare} tone="bg-[#fff1e7] text-[#d9620d]" /><StatCard label="Aniversários próximos" value="6" helper="nos próximos 7 dias" icon={CircleCheck} tone="bg-[#eaf8f2] text-[#14835b]" /></div><div className="overflow-hidden rounded-[22px] border border-[#e9edf3] bg-white shadow-[0_8px_24px_rgba(24,43,73,0.04)]"><div className="flex flex-col justify-between gap-3 border-b border-[#eef1f5] p-5 sm:flex-row sm:items-center"><div><h2 className="font-display text-[16px] font-bold text-[#172b4d]">Clientes cadastrados</h2><p className="mt-1 text-[11px] text-[#8d9aaa]">Os novos registros ficam salvos para a próxima visita.</p></div><div className="relative"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9aa6b6]" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar cliente..." className="h-9 w-full rounded-xl border-[#e1e7ef] pl-9 text-[11px] sm:w-[230px]" /></div></div><div className="divide-y divide-[#eef1f5]">{filtered.map((customer) => <button key={customer.id} onClick={() => toast.info(`Abrindo histórico de ${customer.name}`)} className="flex w-full flex-col gap-3 p-5 text-left transition hover:bg-[#fbfcfd] sm:flex-row sm:items-center"><div className="flex min-w-0 flex-1 items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#e4b89c] text-[11px] font-bold text-[#6d3e2a]">{customer.name.split(" ").map((part) => part[0]).slice(0, 2).join("")}</div><div className="min-w-0"><p className="truncate text-[12px] font-bold text-[#344861]">{customer.name}</p><p className="mt-1 text-[11px] text-[#9aa6b6]">{customer.type} · {customer.contact}</p></div></div><span className="rounded-full bg-[#f4f6f8] px-2.5 py-1 text-[10px] font-bold text-[#708096]">{customer.status}</span><span className="w-24 text-right text-[12px] font-bold text-[#172b4d]">{customer.value}</span><ChevronRight size={16} className="text-[#c4cfdb]" /></button>)}</div></div>{open && <CreateDialog title="Cadastrar cliente" fields={[{ id: "name", label: "Nome ou razão social", placeholder: "Ex.: João da Silva" }, { id: "contact", label: "Telefone ou WhatsApp", placeholder: "(11) 99999-9999" }, { id: "value", label: "Valor estimado", placeholder: "R$ 0,00" }]} onClose={() => setOpen(false)} onSave={(values) => { setCustomers((current) => [{ id: `customer-${Date.now()}`, name: values.name, type: "Pessoa física", contact: values.contact, status: "Novo contato", value: values.value || "R$ 0" }, ...current]); setOpen(false); toast.success("Cliente salvo com sucesso"); }} />}</div>;
+}
+
+function parseMoney(value: unknown): number {
+  if (typeof value === "number") return value;
+  const text = String(value ?? "").trim();
+  if (!text) return 0;
+  const normalized = text.replace(/[^0-9,.-]/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".");
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+function moneyBRL(value: number): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function CRMView() {
+  const { records: quotes } = useCompanyRecords<WorkflowQuote>("quotes");
+  const activeQuotes = quotes.filter((quote) => !["Aprovado", "Cancelado"].includes(quote.status));
+  const approvedQuotes = quotes.filter((quote) => quote.status === "Aprovado");
+  const totalOpen = activeQuotes.reduce((sum, quote) => sum + parseMoney(quote.finalValue), 0);
+  const totalApproved = approvedQuotes.reduce((sum, quote) => sum + parseMoney(quote.finalValue), 0);
+  const totalPipeline = quotes.filter((quote) => quote.status !== "Cancelado").reduce((sum, quote) => sum + parseMoney(quote.finalValue), 0);
+  const stages = [
+    { label: "Rascunho", items: quotes.filter((quote) => quote.status === "Rascunho"), tone: "bg-[#f2f5f8] text-[#687b8f]" },
+    { label: "Em aberto", items: activeQuotes.filter((quote) => quote.status !== "Rascunho"), tone: "bg-[#fff1e7] text-[#d9620d]" },
+    { label: "Aprovados", items: approvedQuotes, tone: "bg-[#eaf8f2] text-[#14835b]" },
+  ];
+  return <div>
+    <PageHeading eyebrow="Comercial · CRM" title="CRM — funil e valores" description="Acompanhe o valor de cada oportunidade e dos orçamentos cadastrados pela sua empresa." />
+    <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StatCard label="Valor total no funil" value={moneyBRL(totalPipeline)} helper="orçamentos não cancelados" icon={Wallet} tone="bg-[#eaf2ff] text-[#1453a6]" />
+      <StatCard label="Valor em aberto" value={moneyBRL(totalOpen)} helper={`${activeQuotes.length} orçamento(s) aguardando etapa`} icon={FileText} tone="bg-[#fff1e7] text-[#d9620d]" />
+      <StatCard label="Valor aprovado" value={moneyBRL(totalApproved)} helper={`${approvedQuotes.length} orçamento(s) aprovados`} icon={CircleCheck} tone="bg-[#eaf8f2] text-[#14835b]" />
+      <StatCard label="Orçamentos no CRM" value={String(quotes.length)} helper="registros da empresa" icon={BarChart3} tone="bg-[#f2edff] text-[#7852d6]" />
+    </div>
+    <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {stages.map((stage) => <section key={stage.label} className="rounded-[22px] border border-[#e9edf3] bg-white p-4 shadow-[0_8px_24px_rgba(24,43,73,0.04)]">
+        <div className="mb-3 flex items-center justify-between gap-2"><h2 className="text-[12px] font-extrabold text-[#344861]">{stage.label}</h2><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${stage.tone}`}>{stage.items.length}</span></div>
+        <p className="font-display text-[20px] font-extrabold text-[#17324d]">{moneyBRL(stage.items.reduce((sum, quote) => sum + parseMoney(quote.finalValue), 0))}</p>
+        <p className="mt-1 text-[10px] text-[#9aa6b6]">Valor somado nesta etapa</p>
+      </section>)}
+    </div>
+    <section className="overflow-hidden rounded-[22px] border border-[#e9edf3] bg-white shadow-[0_8px_24px_rgba(24,43,73,0.04)]">
+      <div className="border-b border-[#eef1f5] p-5"><h2 className="font-display text-[16px] font-bold text-[#172b4d]">Oportunidades e valores</h2><p className="mt-1 text-[11px] text-[#8d9aaa]">Os valores são lidos dos orçamentos reais vinculados à empresa.</p></div>
+      {quotes.length ? <div className="divide-y divide-[#eef1f5]">{quotes.map((quote) => <div key={quote.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1"><p className="text-[12px] font-extrabold text-[#344861]">{quote.id} · {quote.customerName || "Cliente não informado"}</p><p className="mt-1 truncate text-[11px] text-[#8d9aaa]">{quote.productModel || "Serviço a definir"} · {quote.measurements || "Medidas pendentes"}</p></div>
+        <span className={`w-fit rounded-full px-2.5 py-1 text-[9px] font-extrabold ${quote.status === "Aprovado" ? "bg-[#eaf8f2] text-[#14835b]" : quote.status === "Cancelado" ? "bg-[#fff0ec] text-[#c35c42]" : "bg-[#fff1e7] text-[#d9620d]"}`}>{quote.status}</span>
+        <strong className="text-[13px] font-extrabold text-[#17324d]">{moneyBRL(parseMoney(quote.finalValue))}</strong>
+      </div>)}</div> : <div className="p-10 text-center text-[12px] text-[#8d9aaa]">Ainda não há orçamentos cadastrados para exibir valores. Crie um orçamento para alimentar o CRM.</div>}
+    </section>
+  </div>;
 }
 
 function SalesView() {
@@ -182,6 +234,7 @@ function AgentView() {
 }
 
 export function ModuleView({ module, onModuleChange }: ModuleViewProps) {
+  if (module === "crm") return <CRMView />;
   if (module === "vendas") return <SalesView />;
   if (module === "clientes" || module === "orcamentos" || module === "os" || module === "operacao" || module === "equipe" || module === "gestao") return <WorkflowView module={module} onModuleChange={onModuleChange} />;
   if (module === "agenda" || module === "notificacoes" || module === "financeiro" || module === "relatorios" || module === "configuracoes") return <OperationalView module={module} onModuleChange={onModuleChange} />;
