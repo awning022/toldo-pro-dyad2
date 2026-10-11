@@ -62,7 +62,7 @@ type AgentMobileProps = {
 type ChatMessage = { id: string; from: "ai" | "user"; text: string; time?: string; category?: AssistantCategory };
 type SyncStatus = "pending" | "syncing" | "synced" | "failed";
 type SyncItem = { id: string; title: string; kind: "command" | "action"; status: SyncStatus; createdAt: string };
-type PendingAction = AssistantPendingAction & { category: AssistantCategory };
+type PendingAction = AssistantPendingAction & { category: AssistantCategory; payload?: { entity: "leads"; data: Record<string, unknown> } };
 type SpeechRecognitionLike = {
   lang: string;
   interimResults: boolean;
@@ -108,6 +108,20 @@ const categoryLabels: Record<AssistantCategory, string> = {
 };
 
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+function parseLeadCreationRequest(raw: string) {
+  const normalized = raw.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLocaleLowerCase();
+  const asksToCreate = /\\b(create|add|register|crie|criar|cadastre|cadastrar|registre|registrar|crear|registra)\\b/.test(normalized);
+  const mentionsLead = /\\b(lead|leads|prospect|prospects)\\b/.test(normalized);
+  if (!asksToCreate || !mentionsLead) return null;
+  const phoneMatch = raw.match(/(?:\\+?\\d[\\d\\s().-]{7,}\\d)/);
+  const nameMatch = raw.match(/\\b(?:para|for|to)\\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*(?:\\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*){0,3})/i);
+  const name = nameMatch?.[1]?.replace(/[,.!?;:]+$/, "").trim();
+  const phone = phoneMatch?.[0]?.trim().replace(/\\s{2,}/g, " ");
+  if (!name || !phone) return { missing: !name && !phone ? "both" : !name ? "name" : "phone" } as const;
+  const id = crypto.randomUUID();
+  return { entity: "leads" as const, data: { id, name, phone, stage: "Novo contato", status: "Novo contato", source: "IA Toldo Pro", createdAt: new Date().toISOString() } };
+}
 
 function useStored<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(() => {
@@ -211,6 +225,36 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
     appendMessage("user", text);
     setCommand("");
     setAgentStatus("thinking");
+    const leadRequest = parseLeadCreationRequest(text);
+    if (leadRequest) {
+      if ("missing" in leadRequest) {
+        const ask = resolvedLanguage === "en-US"
+          ? "I can prepare the lead, but I need the contact's full name and phone number. Send both in one message."
+          : resolvedLanguage === "es-ES"
+            ? "Puedo preparar el lead, pero necesito el nombre completo y el teléfono del contacto. Envíame ambos en un mensaje."
+            : resolvedLanguage === "ar"
+              ? "يمكنني تجهيز العميل المحتمل، لكن أحتاج إلى الاسم الكامل ورقم الهاتف. أرسل كليهما في رسالة واحدة."
+              : "Posso preparar o lead, mas preciso do nome completo e do telefone do contato. Envie os dois na mesma mensagem.";
+        respond(ask, "comercial");
+        requestInFlightRef.current = false;
+        return;
+      }
+      if (!access.can("manageCustomers")) {
+        respond(resolvedLanguage === "en-US" ? "Your role cannot create leads." : resolvedLanguage === "es-ES" ? "Tu rol no puede crear leads." : resolvedLanguage === "ar" ? "لا تسمح صلاحيات دورك بإنشاء العملاء المحتملين." : "Seu cargo não tem permissão para criar leads.", "comercial");
+        requestInFlightRef.current = false;
+        return;
+      }
+      setPendingAction({
+        title: resolvedLanguage === "en-US" ? `Create lead: ${leadRequest.data.name}` : resolvedLanguage === "es-ES" ? `Crear lead: ${leadRequest.data.name}` : resolvedLanguage === "ar" ? `إنشاء عميل محتمل: ${leadRequest.data.name}` : `Criar lead: ${leadRequest.data.name}`,
+        description: `${leadRequest.data.name} · ${leadRequest.data.phone}`,
+        kind: "action",
+        category: "comercial",
+        payload: leadRequest,
+      });
+      respond(resolvedLanguage === "en-US" ? "I prepared this lead. Check the details and confirm to save it to your company's records." : resolvedLanguage === "es-ES" ? "Preparé este lead. Revisa los datos y confirma para guardarlo en los registros de tu empresa." : resolvedLanguage === "ar" ? "جهزت بيانات العميل المحتمل. راجع التفاصيل وأكد لحفظها في سجلات شركتك." : "Preparei esse lead. Confira os dados e confirme para salvá-lo nos registros da sua empresa.", "comercial");
+      requestInFlightRef.current = false;
+      return;
+    }
     if (!online) {
       respond("Para consultar os dados atuais da empresa, conecte-se à internet e tente novamente.", "sistema");
       requestInFlightRef.current = false;
@@ -265,10 +309,35 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
     }
   };
 
-  const confirmAction = () => {
+  const confirmAction = async () => {
     if (!pendingAction) return;
-    addToQueue(pendingAction.title, "action");
-    respond(online ? "Ação autorizada e enviada para a fila do Toldo Pro.\nRegistro protegido pelas permissões atuais do usuário.\nPróxima ação: acompanhar a sincronização na fila." : "Ação autorizada e salva localmente.\nO registro permanece protegido no aparelho até a conexão voltar.\nPróxima ação: sincronizar a fila quando estiver online.", pendingAction.category);
+    if (pendingAction.payload?.entity === "leads") {
+      if (!access.can("manageCustomers")) {
+        respond(resolvedLanguage === "en-US" ? "Your role no longer has permission to create leads." : resolvedLanguage === "es-ES" ? "Tu rol ya no tiene permiso para crear leads." : resolvedLanguage === "ar" ? "لم تعد صلاحيات دورك تسمح بإنشاء العملاء المحتملين." : "Seu cargo não tem mais permissão para criar leads.", "comercial");
+        setPendingAction(null);
+        return;
+      }
+      if (!supabase) { toast.error("O serviço de dados não está configurado."); return; }
+      const payload = pendingAction.payload;
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) { toast.error("Sua sessão expirou. Entre novamente."); return; }
+      const { error } = await supabase.from("operational_records").insert({
+        company_id: access.companyId,
+        entity: "leads",
+        record_id: String(payload.data.id),
+        data: payload.data,
+      });
+      if (error) {
+        console.error("Lead creation failed", error.message);
+        toast.error(resolvedLanguage === "en-US" ? "The lead could not be saved. Check your permissions and try again." : resolvedLanguage === "es-ES" ? "No se pudo guardar el lead. Comprueba los permisos e inténtalo de nuevo." : resolvedLanguage === "ar" ? "تعذر حفظ العميل المحتمل. تحقق من الأذونات وحاول مرة أخرى." : "Não foi possível salvar o lead. Confira suas permissões e tente novamente.");
+        return;
+      }
+      respond(resolvedLanguage === "en-US" ? `Lead ${payload.data.name} was saved successfully.` : resolvedLanguage === "es-ES" ? `El lead ${payload.data.name} se guardó correctamente.` : resolvedLanguage === "ar" ? `تم حفظ العميل المحتمل ${payload.data.name} بنجاح.` : `Lead ${payload.data.name} salvo com sucesso.`, "comercial");
+      setPendingAction(null);
+      toast.success(resolvedLanguage === "en-US" ? "Lead saved" : resolvedLanguage === "es-ES" ? "Lead guardado" : resolvedLanguage === "ar" ? "تم الحفظ" : "Lead salvo");
+      return;
+    }
+    respond(resolvedLanguage === "en-US" ? "This action is not connected to a live operation yet. Nothing was changed." : resolvedLanguage === "es-ES" ? "Esta acción aún no está conectada a una operación real. No se modificó nada." : resolvedLanguage === "ar" ? "هذا الإجراء غير متصل بعملية فعلية بعد. لم يتم تغيير أي شيء." : "Esta ação ainda não está conectada a uma operação real. Nada foi alterado.", pendingAction.category);
     setPendingAction(null);
   };
 
