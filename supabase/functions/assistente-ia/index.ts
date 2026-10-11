@@ -22,25 +22,25 @@ type OperationalRecord = {
 const domainRules = [
   {
     id: "agenda",
-    terms: ["agenda", "agend", "evento", "visita", "amanha", "horario"],
+    terms: ["agenda", "agend", "evento", "visita", "amanha", "horario", "calendar", "schedule", "event", "visit", "tomorrow", "time", "calendario", "mañana", "جدول", "مواعيد", "زيارة", "غدا"],
     entities: ["agenda", "events"],
     permissions: ["manageAgenda"],
   },
   {
     id: "customers",
-    terms: ["cliente", "cpf", "telefone", "contato", "lead", "cadastro"],
+    terms: ["cliente", "cpf", "telefone", "contato", "lead", "cadastro", "customer", "customers", "contact", "phone", "register", "client", "clients", "contacto", "telefono", "registro", "عميل", "عملاء", "اتصال", "هاتف", "تسجيل"],
     entities: ["customers", "clients", "leads"],
     permissions: ["manageCustomers"],
   },
   {
     id: "quotes",
-    terms: ["orcamento", "orcamentos", "cotacao", "proposta"],
+    terms: ["orcamento", "orcamentos", "cotacao", "proposta", "quote", "quotes", "estimate", "estimates", "proposal", "presupuesto", "presupuestos", "cotizacion", "عرض سعر", "عروض الأسعار"],
     entities: ["quotes"],
     permissions: ["manageQuotes"],
   },
   {
     id: "work_orders",
-    terms: ["ordem de servico", "ordens de servico", "os", "pedido"],
+    terms: ["ordem de servico", "ordens de servico", "os", "pedido", "work order", "work orders", "service order", "service orders", "order", "orden de trabajo", "orden de servicio", "orden", "أمر عمل", "أوامر العمل"],
     entities: ["work_orders", "os"],
     permissions: [
       "issueOS",
@@ -50,13 +50,13 @@ const domainRules = [
   },
   {
     id: "production",
-    terms: ["producao", "fabricacao", "fabricar"],
+    terms: ["producao", "fabricacao", "fabricar", "production", "manufacturing", "fabrication", "produccion", "fabricacion", "الإنتاج", "تصنيع"],
     entities: ["production"],
     permissions: ["manageProduction"],
   },
   {
     id: "installations",
-    terms: ["instalacao", "instalacoes", "instalador", "finalizada"],
+    terms: ["instalacao", "instalacoes", "instalador", "finalizada", "installation", "installations", "installer", "instalacion", "instalaciones", "terminada", "تركيب", "تركيبات", "فني التركيب"],
     entities: ["installations"],
     permissions: ["manageInstallations"],
   },
@@ -68,7 +68,7 @@ const domainRules = [
       "materiais",
       "lona",
       "motor",
-      "movimentacao",
+      "movimentacao", "inventory", "stock", "materials", "movement", "inventario", "existencias", "materiales", "movimiento", "مخزون", "مواد", "محرك",
     ],
     entities: [
       "materials",
@@ -93,14 +93,14 @@ const domainRules = [
       "custo",
       "margem",
       "valor",
-      "preco",
+      "preco", "finance", "financial", "payment", "payments", "pay", "receive", "cost", "margin", "price", "finanzas", "financiero", "pago", "costo", "margen", "precio", "مالية", "دفع", "استلام", "سعر",
     ],
     entities: [],
     permissions: ["viewFinancial"],
   },
   {
     id: "notifications",
-    terms: ["notificacao", "notificacoes", "solicitacao"],
+    terms: ["notificacao", "notificacoes", "solicitacao", "notification", "notifications", "request", "solicitud", "notificacion", "notificaciones", "إشعار", "إشعارات", "طلب"],
     entities: ["notifications", "supply_requests"],
     permissions: [
       "readNotifications",
@@ -311,6 +311,10 @@ function fieldsForRecord(
     query.includes("telefone") ||
     query.includes("contato") ||
     query.includes("celular") ||
+    query.includes("phone") ||
+    query.includes("contact") ||
+    query.includes("telefono") ||
+    query.includes("هاتف") ||
     digits.length >= 8
   ) {
     fields.push("phone");
@@ -320,6 +324,8 @@ function fieldsForRecord(
     query.includes("cpf") ||
     query.includes("cnpj") ||
     query.includes("documento") ||
+    query.includes("document") ||
+    query.includes("tax id") ||
     digits.length >= 11
   ) {
     fields.push("taxId", "document");
@@ -327,14 +333,21 @@ function fieldsForRecord(
 
   if (
     query.includes("email") ||
-    query.includes("e-mail")
+    query.includes("e-mail") ||
+    query.includes("correo") ||
+    query.includes("البريد")
   ) {
     fields.push("email");
   }
 
   if (
     query.includes("endereco") ||
-    query.includes("cidade")
+    query.includes("cidade") ||
+    query.includes("address") ||
+    query.includes("city") ||
+    query.includes("direccion") ||
+    query.includes("dirección") ||
+    query.includes("عنوان")
   ) {
     fields.push("address", "city");
   }
