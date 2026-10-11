@@ -667,7 +667,7 @@ Deno.serve(async (request) => {
   const queryTerms = normalize(searchContext)
     .split(/[^a-z0-9]+/)
     .filter((term) => term.length >= 3);
-  const rawRows = (selectedRows || []) as OperationalRecord[];
+  const rawRows = (rows || []) as OperationalRecord[];
   const matchingRows = queryTerms.length
     ? rawRows.filter((row) => {
         const searchable = normalize(JSON.stringify(row.data));
@@ -676,9 +676,7 @@ Deno.serve(async (request) => {
     : rawRows;
   const selectedRows = (matchingRows.length ? matchingRows : rawRows).slice(0, 25);
 
-  const records = (
-    (rows || []) as OperationalRecord[]
-  ).map((row) => ({
+  const records = selectedRows.map((row) => ({
     id: row.record_id,
     entity: row.entity,
     updatedAt: row.updated_at,
