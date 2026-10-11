@@ -211,7 +211,9 @@ main > div.mx-auto .metric-card::after {
   opacity: .7;
 }
 aside {
-  background-image: linear-gradient(160deg, rgba(255,255,255,.99), rgba(247,249,253,.97));
+  background-color: #172b4d;
+  background-image: linear-gradient(160deg, #1b3456, #10223c);
+  color: #fff;
 }
 main > header {
   backdrop-filter: blur(18px);
@@ -232,3 +234,27 @@ aside button {
     transform: none;
   }
 }
+
+
+/* Contraste reforçado: textos auxiliares continuam discretos, mas legíveis. */
+.text-\\[\\#9aa6b6\\] { color: #64748b !important; }
+.text-\\[\\#aab5c0\\] { color: #64748b !important; }
+.text-\\[\\#b0bac6\\] { color: #64748b !important; }
+.text-\\[\\#9aa7b7\\] { color: #64748b !important; }
+.text-\\[\\#8d9aaa\\] { color: #63748a !important; }
+.text-\\[\\#90a0b2\\] { color: #5f7188 !important; }
+.text-\\[\\#96a2b2\\] { color: #64748b !important; }
+.text-\\[\\#9aa6b6\\] { color: #64748b !important; }
+.text-\\[\\#708096\\] { color: #52647d !important; }
+.text-\\[\\#718096\\] { color: #52647d !important; }
+.text-\\[\\#8190a3\\] { color: #63748a !important; }
+.text-\\[\\#7891ad\\] { color: #9fb3ca !important; }
+.text-\\[\\#94abc4\\] { color: #b9cbe0 !important; }
+
+/* Leitura e navegação mais confortáveis em todas as áreas do painel. */
+main > div.mx-auto { color: #243852; }
+main > div.mx-auto p { line-height: 1.55; }
+main > div.mx-auto input::placeholder,
+main > div.mx-auto textarea::placeholder { color: #718096; opacity: 1; }
+aside .text-\\[\\#7891ad\\] { color: #9fb3ca !important; }
+aside .text-\\[\\#94abc4\\] { color: #b9cbe0 !important; }
