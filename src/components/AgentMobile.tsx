@@ -197,24 +197,30 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
   }, []);
 
   const syncPending = useCallback(() => {
-    if (!online) return;
+    if (!online) {
+      toast.info(resolvedLanguage === "en-US" ? "You're offline. Nothing was sent." : resolvedLanguage === "es-ES" ? "Estás sin conexión. No se envió nada." : resolvedLanguage === "ar" ? "أنت غير متصل. لم يتم إرسال أي شيء." : "Você está offline. Nada foi enviado.");
+      return;
+    }
     const pending = queue.filter((item) => item.status === "pending" || item.status === "failed");
-    if (!pending.length) return;
-    const ids = pending.map((item) => item.id);
-    setQueue((current) => current.map((item) => ids.includes(item.id) ? { ...item, status: "syncing" } : item));
-    window.setTimeout(() => setQueue((current) => current.map((item) => ids.includes(item.id) ? { ...item, status: "synced" } : item)), 850);
-  }, [online, queue, setQueue]);
-
-  useEffect(() => { if (online) syncPending(); }, [online, syncPending]);
+    if (!pending.length) {
+      toast.info(resolvedLanguage === "en-US" ? "No pending actions in the local queue." : resolvedLanguage === "es-ES" ? "No hay acciones pendientes en la cola local." : resolvedLanguage === "ar" ? "لا توجد إجراءات معلقة في قائمة الانتظار المحلية." : "Não há ações pendentes na fila local.");
+      return;
+    }
+    setQueue((current) => current.map((item) =>
+      pending.some((pendingItem) => pendingItem.id === item.id)
+        ? { ...item, status: "failed" }
+        : item
+    ));
+    toast.warning(resolvedLanguage === "en-US" ? "This local queue is not connected to server-side actions yet. Nothing was changed." : resolvedLanguage === "es-ES" ? "Esta cola local aún no está conectada a acciones del servidor. No se modificó nada." : resolvedLanguage === "ar" ? "قائمة الانتظار المحلية غير متصلة بإجراءات الخادم بعد. لم يتم تغيير أي شيء." : "Essa fila local ainda não está conectada às ações do servidor. Nada foi alterado.");
+  }, [online, queue, setQueue, resolvedLanguage]);
 
   const addToQueue = useCallback((title: string, kind: SyncItem["kind"]) => {
     const id = `${kind}:${title.trim().toLocaleLowerCase("pt-BR")}`;
     setQueue((current) => {
       if (current.some((item) => item.id === id && item.status !== "failed")) return current;
-      return [{ id, title, kind, status: online ? "syncing" : "pending", createdAt: new Date().toISOString() }, ...current];
+      return [{ id, title, kind, status: "pending", createdAt: new Date().toISOString() }, ...current];
     });
-    if (online) window.setTimeout(() => setQueue((current) => current.map((item) => item.id === id ? { ...item, status: "synced" } : item)), 850);
-  }, [online, setQueue]);
+  }, [setQueue]);
 
   const appendMessage = (from: ChatMessage["from"], text: string, category?: AssistantCategory) => setMessages((current) => [...current, { id: makeId("message"), from, text, time: "agora", category }]);
 
