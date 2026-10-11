@@ -8,10 +8,12 @@ import { AuthCallbackPage, ChangeEmailPage, ForgotPasswordPage, ResetPasswordPag
 import Index from "./pages/Index";
 import IA from "./pages/IA";
 import NotFound from "./pages/NotFound";
+import { LanguageProvider } from "@/lib/LanguageContext";
 
 const queryClient = new QueryClient();
 
 const App = () => (
+  <LanguageProvider>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
