@@ -63,3 +63,110 @@ button {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* Toldo Pro — acabamento visual premium */
+:root {
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --tp-ink: #172b4d;
+  --tp-muted: #718096;
+  --tp-border: #e6ebf2;
+  --tp-orange: #f47b20;
+  --tp-canvas: #f4f7fb;
+}
+html { background: var(--tp-canvas); }
+body {
+  background:
+    radial-gradient(ellipse at 80% 0%, rgba(244,123,32,.055), transparent 34rem),
+    var(--tp-canvas);
+  color: var(--tp-ink);
+  letter-spacing: -.01em;
+}
+#root { min-height: 100vh; }
+::selection { background: rgba(244,123,32,.2); color: var(--tp-ink); }
+
+/* Navegação e estrutura */
+aside {
+  box-shadow: 8px 0 32px rgba(23,43,77,.06);
+}
+aside button { min-height: 40px; }
+main > header {
+  border-bottom-color: rgba(224,231,240,.9) !important;
+  box-shadow: 0 4px 20px rgba(23,43,77,.025);
+}
+main > header button {
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+main > header button:hover {
+  border-color: #f2bf98;
+  box-shadow: 0 5px 14px rgba(23,43,77,.07);
+}
+main > div.mx-auto {
+  animation: tp-page-in .32s ease-out both;
+}
+@keyframes tp-page-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Cartões, painéis, tabelas e formulários */
+main > div.mx-auto .rounded-\[22px\],
+main > div.mx-auto .rounded-\[20px\] {
+  transition: box-shadow .2s ease, border-color .2s ease, transform .2s ease;
+}
+main > div.mx-auto .rounded-\[22px\]:hover,
+main > div.mx-auto .rounded-\[20px\]:hover {
+  border-color: #dbe3ee;
+  box-shadow: 0 12px 32px rgba(23,43,77,.065);
+}
+main > div.mx-auto input,
+main > div.mx-auto select,
+main > div.mx-auto textarea {
+  border-color: #dfe6ef;
+  background-color: #fff;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+main > div.mx-auto input:focus,
+main > div.mx-auto select:focus,
+main > div.mx-auto textarea:focus {
+  border-color: #f4a66f;
+  box-shadow: 0 0 0 3px rgba(244,123,32,.11);
+}
+main > div.mx-auto button:focus-visible,
+aside button:focus-visible {
+  outline: 3px solid rgba(244,123,32,.42);
+  outline-offset: 3px;
+}
+main > div.mx-auto table { border-collapse: separate; border-spacing: 0; }
+main > div.mx-auto th {
+  color: #718096;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+main > div.mx-auto td { vertical-align: middle; }
+main > div.mx-auto tr:hover td { background-color: #fafbfd; }
+
+/* Tipografia mais consistente e hierarquia mais clara */
+h1, h2, h3, .font-display { letter-spacing: -.035em; }
+h1 { line-height: 1.15; }
+p { text-wrap: pretty; }
+button { font-weight: 600; }
+button:active { transform: translateY(1px); }
+a { text-underline-offset: 3px; }
+
+/* Melhor leitura em telas pequenas */
+@media (max-width: 640px) {
+  main > div.mx-auto { padding-top: 1.25rem; }
+  main > div.mx-auto h1 { font-size: 1.65rem; }
+  main > div.mx-auto .rounded-\[22px\] { border-radius: 16px; }
+  aside { box-shadow: 18px 0 48px rgba(23,43,77,.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
