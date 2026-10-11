@@ -214,14 +214,6 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
     toast.warning(resolvedLanguage === "en-US" ? "This local queue is not connected to server-side actions yet. Nothing was changed." : resolvedLanguage === "es-ES" ? "Esta cola local aún no está conectada a acciones del servidor. No se modificó nada." : resolvedLanguage === "ar" ? "قائمة الانتظار المحلية غير متصلة بإجراءات الخادم بعد. لم يتم تغيير أي شيء." : "Essa fila local ainda não está conectada às ações do servidor. Nada foi alterado.");
   }, [online, queue, setQueue, resolvedLanguage]);
 
-  const addToQueue = useCallback((title: string, kind: SyncItem["kind"]) => {
-    const id = `${kind}:${title.trim().toLocaleLowerCase("pt-BR")}`;
-    setQueue((current) => {
-      if (current.some((item) => item.id === id && item.status !== "failed")) return current;
-      return [{ id, title, kind, status: "pending", createdAt: new Date().toISOString() }, ...current];
-    });
-  }, [setQueue]);
-
   const appendMessage = (from: ChatMessage["from"], text: string, category?: AssistantCategory) => setMessages((current) => [...current, { id: makeId("message"), from, text, time: "agora", category }]);
 
   const send = async (rawText = command) => {
