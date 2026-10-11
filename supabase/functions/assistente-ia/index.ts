@@ -828,7 +828,7 @@ Deno.serve(async (request) => {
 
   let aiResponse: Response;
   try {
-    aiResponse = await fetch(`${aiServerUrl.replace(/\\/+$/, "")}/v1/chat`, {
+    aiResponse = await fetch(`${aiServerUrl}/v1/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
