@@ -48,7 +48,7 @@ import { toast } from "sonner";
 import { useCompanyRecords } from "@/lib/useCompanyRecords";
 import type { WorkflowQuote } from "@/lib/workflowData";
 
-export type ModuleKey = "painel" | "agenda" | "notificacoes" | "crm" | "clientes" | "vendas" | "orcamentos" | "os" | "operacao" | "estoque" | "instalacoes" | "financeiro" | "relatorios" | "equipe" | "gestao" | "agente" | "configuracoes";
+export type ModuleKey = "painel" | "agenda" | "notificacoes" | "crm" | "clientes" | "vendas" | "orcamentos" | "os" | "operacao" | "estoque" | "instalacoes" | "financeiro" | "relatorios" | "equipe" | "gestao" | "agente" | "whatsapp" | "configuracoes";
 type ModuleViewProps = { module: ModuleKey; onModuleChange: (module: ModuleKey) => void };
 type StatCardProps = { label: string; value: string; helper: string; icon: LucideIcon; tone: string };
 type Field = { id: string; label: string; placeholder: string; type?: string; required?: boolean };
@@ -234,6 +234,39 @@ function AgentView() {
   return <div><PageHeading eyebrow="Extensão inteligente" title="Agente Toldo Pro IA" description="Converse, consulte a operação e registre atividades mesmo sem internet." action={online ? "Testar modo offline" : "Voltar ao online"} onAction={() => setOnline((current) => !current)} /><div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_.9fr]"><div className="overflow-hidden rounded-[22px] border border-[#e9edf3] bg-white shadow-[0_8px_24px_rgba(24,43,73,0.04)]"><div className="flex items-center justify-between border-b border-[#eef1f5] bg-[#172b4d] px-5 py-4 text-white"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f47b20]"><Bot size={18} /></div><div><p className="text-[12px] font-bold">Toldo Pro IA</p><p className="mt-1 flex items-center gap-1 text-[10px] text-[#b3c4d8]"><span className={`h-1.5 w-1.5 rounded-full ${online ? "bg-[#65d7a5]" : "bg-[#f07c70]"}`} /> {online ? "Conectado ao Toldo Pro" : "Offline · trabalhando localmente"}</p></div></div><span className={`rounded-full px-2 py-1 text-[9px] font-bold ${online ? "bg-[#1f795c] text-[#d5f7e8]" : "bg-[#884b49] text-[#ffe0db]"}`}>{online ? "ONLINE" : "OFFLINE"}</span></div><div className="min-h-[330px] space-y-3 bg-[#f8fafc] p-5">{messages.map((message, index) => <div key={`${message.text}-${index}`} className={`max-w-[78%] rounded-2xl p-3.5 text-[12px] leading-5 ${message.from === "user" ? "ml-auto rounded-tr-md bg-[#f47b20] text-white" : "rounded-tl-md bg-white text-[#52647d] shadow-sm"}`}>{message.text}</div>)}<div className="flex flex-wrap gap-2 pt-2"><button onClick={() => send("Quais instalações eu tenho amanhã?")} className="rounded-full border border-[#dfe6ef] bg-white px-3 py-2 text-[10px] font-bold text-[#52647d] hover:border-[#f3b07f] hover:text-[#d9620d]">Instalações de amanhã</button><button onClick={() => send("Crie uma lista de compras com os materiais abaixo do mínimo.")} className="rounded-full border border-[#dfe6ef] bg-white px-3 py-2 text-[10px] font-bold text-[#52647d] hover:border-[#f3b07f] hover:text-[#d9620d]">Lista de compras</button></div></div><div className="flex items-center gap-2 border-t border-[#eef1f5] p-4"><button onClick={() => toast.info("Comando de voz pronto para integração")} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#e1e7ef] text-[#1453a6]" aria-label="Falar com a IA"><Mic size={17} /></button><Input value={command} onChange={(event) => setCommand(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") send(); }} placeholder="Digite um comando para a IA..." className="h-10 rounded-xl text-[11px]" /><button onClick={() => send()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f47b20] text-white" aria-label="Enviar comando"><ArrowRight size={17} /></button></div></div><div className="space-y-5"><div className={`rounded-[22px] p-5 text-white shadow-[0_10px_26px_rgba(23,43,77,0.16)] ${online ? "bg-[#172b4d]" : "bg-[#6d3d3c]"}`}><div className="flex items-center gap-2">{online ? <Wifi size={16} /> : <CloudOff size={16} />}<span className="text-[11px] font-bold uppercase tracking-[0.12em]">Sincronização</span></div><h2 className="mt-4 font-display text-[20px] font-bold">{online ? "Tudo sincronizado" : `${queue.length} operações pendentes`}</h2><p className="mt-2 text-[11px] leading-5 text-white/70">{online ? "As ações autorizadas estão atualizadas com o sistema principal." : "Seus registros ficam protegidos no aparelho até a conexão voltar."}</p><div className="mt-5 flex items-center justify-between border-t border-white/20 pt-4 text-[10px] font-bold"><span>{online ? "Última sincronização agora" : "Fila persistida localmente"}</span><button onClick={() => { setQueue([]); setOnline(true); toast.success("Fila sincronizada com sucesso"); }} className="flex items-center gap-1.5 text-[#f7a66c]"><RefreshCw size={13} /> Sincronizar</button></div></div><div className="rounded-[22px] border border-[#e9edf3] bg-white p-5 shadow-[0_8px_24px_rgba(24,43,77,0.04)]"><div className="flex items-center justify-between"><div><h2 className="font-display text-[16px] font-bold text-[#172b4d]">Fila de sincronização</h2><p className="mt-1 text-[11px] text-[#8d9aaa]">Operações registradas no celular.</p></div><span className="rounded-full bg-[#fff1e7] px-2 py-1 text-[10px] font-bold text-[#d9620d]">{queue.length}</span></div><div className="mt-4 space-y-2">{queue.length ? queue.map((item, index) => <div key={`${item}-${index}`} className="flex items-start gap-2 rounded-xl bg-[#f8fafc] p-3"><Clock3 size={14} className="mt-0.5 shrink-0 text-[#d9620d]" /><p className="text-[10px] leading-4 text-[#52647d]">{item}</p></div>) : <div className="flex items-center gap-2 rounded-xl bg-[#eaf8f2] p-3 text-[10px] font-bold text-[#14835b]"><Check size={14} /> Tudo sincronizado</div>}</div></div><div className="rounded-[22px] border border-[#f4d5be] bg-[#fff8f3] p-5"><div className="flex items-center gap-2 text-[#d9620d]"><Camera size={16} /><span className="text-[11px] font-bold uppercase tracking-[0.12em]">Campo offline</span></div><p className="mt-3 text-[12px] leading-5 text-[#9b6a4f]">Fotos, medidas, observações e conclusões de instalação podem ser registradas sem sinal.</p></div></div></div></div>;
 }
 
+function WhatsAppAgentView() {
+  const [phone, setPhone] = useState("");
+  const [businessId, setBusinessId] = useState("");
+  const [accessToken, setAccessToken] = useState("");
+  const [verifyToken, setVerifyToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const webhookUrl = import.meta.env.VITE_WHATSAPP_WEBHOOK_URL || "";
+  const connected = false;
+  return <div className="space-y-5">
+    <PageHeading eyebrow="IA Toldo Pro" title="Conectar WhatsApp" description="Conecte o número da sua empresa para conversar com o agente pelo WhatsApp. Cada conexão é vinculada a uma única empresa." />
+    <div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
+      <section className="rounded-[22px] border border-[#e9edf3] bg-white p-6 shadow-[0_8px_24px_rgba(24,43,73,0.04)]">
+        <div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#e7f8ee] text-[#16804a]"><MessageSquare size={22}/></div><div><h2 className="font-display text-lg font-bold text-[#172b4d]">WhatsApp Business Platform</h2><p className="text-xs text-[#8d9aaa]">Conexão oficial da Meta</p></div></div>
+        <div className="mt-5 rounded-xl border border-[#f2d7ad] bg-[#fff9ed] p-4 text-sm leading-6 text-[#8c5b12]">A conexão ainda não está ativa. Esta tela prepara o fluxo de configuração; para receber mensagens reais, o administrador precisa concluir a configuração da Meta e os segredos do webhook no backend.</div>
+        <div className="mt-5 space-y-4">
+          <label className="block text-sm font-semibold text-[#344861]">Número do WhatsApp Business<input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+55 22 99999-9999" className="mt-2 h-11 w-full rounded-xl border border-[#dfe6ef] px-3 text-sm outline-none focus:border-[#f47b20]"/></label>
+          <label className="block text-sm font-semibold text-[#344861]">ID do número de telefone (Meta)<input value={businessId} onChange={e=>setBusinessId(e.target.value)} placeholder="Phone Number ID fornecido pela Meta" className="mt-2 h-11 w-full rounded-xl border border-[#dfe6ef] px-3 text-sm outline-none focus:border-[#f47b20]"/></label>
+          <p className="text-xs leading-5 text-[#8d9aaa]">O token de acesso e o segredo da aplicação devem ser configurados somente como secrets no servidor, nunca neste formulário nem no navegador.</p>
+          <button disabled={!phone.trim() || !businessId.trim() || saving} onClick={()=>{setSaving(true);toast.info("A conexão ainda depende da configuração segura do webhook e da autorização da Meta.");setSaving(false);}} className="inline-flex h-11 items-center gap-2 rounded-xl bg-[#172b4d] px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"><MessageSquare size={16}/> Preparar conexão</button>
+          <p className="text-xs text-[#8d9aaa]">Status: <strong className="text-[#b87917]">{connected ? "Conectado" : "Aguardando configuração da Meta"}</strong></p>
+        </div>
+      </section>
+      <aside className="rounded-[22px] bg-[#172b4d] p-6 text-white shadow-[0_10px_26px_rgba(23,43,77,0.16)]">
+        <div className="flex items-center gap-2 text-[#f7a66c]"><ShieldCheck size={18}/><span className="text-xs font-bold uppercase tracking-wider">Privacidade por empresa</span></div>
+        <h2 className="mt-4 font-display text-xl font-bold">Seu WhatsApp. Seus dados.</h2>
+        <p className="mt-3 text-sm leading-6 text-white/75">As mensagens recebidas serão roteadas pelo ID do número conectado. O backend deverá validar a empresa e as permissões antes de consultar ou alterar estoque, instalações ou financeiro.</p>
+        <div className="mt-5 space-y-3 text-sm text-white/85"><p>✓ Histórico de mensagens e auditoria</p><p>✓ Proteção contra mensagens duplicadas</p><p>✓ Confirmação antes de alterações sensíveis</p><p>✓ Isolamento de dados entre empresas</p></div>
+        {webhookUrl && <p className="mt-5 break-all text-xs text-white/50">Webhook configurado: {webhookUrl}</p>}
+      </aside>
+    </div>
+  </div>;
+}
+
 export function ModuleView({ module, onModuleChange }: ModuleViewProps) {
   if (module === "crm") return <CRMView />;
   if (module === "vendas") return <SalesView />;
@@ -242,5 +275,6 @@ export function ModuleView({ module, onModuleChange }: ModuleViewProps) {
   if (module === "estoque") return <InventoryView />;
   if (module === "instalacoes") return <WorkflowInstallationsView />;
   if (module === "agente") return <AgentView />;
+  if (module === "whatsapp") return <WhatsAppAgentView />;
   return null;
 }
