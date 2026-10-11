@@ -110,14 +110,14 @@ const categoryLabels: Record<AssistantCategory, string> = {
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 function parseLeadCreationRequest(raw: string) {
-  const normalized = raw.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLocaleLowerCase();
-  const asksToCreate = /\\b(create|add|register|crie|criar|cadastre|cadastrar|registre|registrar|crear|registra)\\b/.test(normalized);
-  const mentionsLead = /\\b(lead|leads|prospect|prospects)\\b/.test(normalized);
+  const normalized = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
+  const asksToCreate = /\b(create|add|register|crie|criar|cadastre|cadastrar|registre|registrar|crear|registra)\b/.test(normalized);
+  const mentionsLead = /\b(lead|leads|prospect|prospects)\b/.test(normalized);
   if (!asksToCreate || !mentionsLead) return null;
-  const phoneMatch = raw.match(/(?:\\+?\\d[\\d\\s().-]{7,}\\d)/);
-  const nameMatch = raw.match(/\\b(?:para|for|to)\\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*(?:\\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*){0,3})/i);
+  const phoneMatch = raw.match(/(?:\+?\d[\d\s().-]{7,}\d)/);
+  const nameMatch = raw.match(/\b(?:para|for|to)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*){0,3})/i);
   const name = nameMatch?.[1]?.replace(/[,.!?;:]+$/, "").trim();
-  const phone = phoneMatch?.[0]?.trim().replace(/\\s{2,}/g, " ");
+  const phone = phoneMatch?.[0]?.trim().replace(/\s{2,}/g, " ");
   if (!name || !phone) return { missing: !name && !phone ? "both" : !name ? "name" : "phone" } as const;
   const id = crypto.randomUUID();
   return { entity: "leads" as const, data: { id, name, phone, stage: "Novo contato", status: "Novo contato", source: "IA Toldo Pro", createdAt: new Date().toISOString() } };
