@@ -51,6 +51,7 @@ import { supabase, supabasePublishableKey } from "@/lib/supabase";
 import type { StockMaterial } from "@/lib/operationsStore";
 import type { FinanceEntry } from "@/components/FinanceView";
 import { toast } from "sonner";
+import { useAppLanguage, LanguageSwitcher } from "@/lib/LanguageContext";
 
 type AgentMobileProps = {
   access: CompanyAccess;
@@ -61,7 +62,7 @@ type AgentMobileProps = {
 type ChatMessage = { id: string; from: "ai" | "user"; text: string; time?: string; category?: AssistantCategory };
 type SyncStatus = "pending" | "syncing" | "synced" | "failed";
 type SyncItem = { id: string; title: string; kind: "command" | "action"; status: SyncStatus; createdAt: string };
-type PendingAction = AssistantPendingAction & { category: AssistantCategory };
+type PendingAction = AssistantPendingAction & { category: AssistantCategory; payload?: { entity: "leads"; data: Record<string, unknown> } };
 type SpeechRecognitionLike = {
   lang: string;
   interimResults: boolean;
@@ -108,6 +109,23 @@ const categoryLabels: Record<AssistantCategory, string> = {
 
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
+function parseLeadCreationRequest(raw: string, language: string) {
+  const normalized = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
+  const arabicAction = /(أنشئ|إنشاء|سجل|أضف|إضافة)/u.test(raw);
+  const asksToCreate = /\b(create|add|register|crie|criar|cadastre|cadastrar|registre|registrar|crear|registra)\b/.test(normalized) || arabicAction;
+  const mentionsLead = /\b(lead|leads|prospect|prospects)\b/.test(normalized) || /عميل محتمل/u.test(raw);
+  if (!asksToCreate || !mentionsLead) return null;
+  const phoneMatch = raw.match(/(?:\+?\d[\d\s().-]{7,}\d)/);
+  const nameMatch = raw.match(/\b(?:para|for|to)\s+([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,3})/iu)
+    || raw.match(/(?:اسم|باسم)\s+([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,3})/u);
+  const name = nameMatch?.[1]?.replace(/[,.!?;:،]+$/, "").trim();
+  const phone = phoneMatch?.[0]?.trim().replace(/\s{2,}/g, " ");
+  if (!name || !phone) return { missing: !name && !phone ? "both" : !name ? "name" : "phone" } as const;
+  const id = crypto.randomUUID();
+  const stage = language === "en-US" ? "New contact" : language === "es-ES" ? "Nuevo contacto" : language === "ar" ? "جهة اتصال جديدة" : "Novo contato";
+  return { entity: "leads" as const, data: { id, name, phone, stage, status: stage, source: "IA Toldo Pro", createdAt: new Date().toISOString() } };
+}
+
 function useStored<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(() => {
     const saved = window.localStorage.getItem(key);
@@ -142,6 +160,7 @@ function SectionTitle({ eyebrow, title, action, onAction, dark = false }: { eyeb
 }
 
 export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps) {
+  const { resolvedLanguage, t } = useAppLanguage();
   const userName = access.fullName.split(" ")[0] || access.email;
   const [online, setOnline] = useState(() => navigator.onLine);
   const [dark, setDark] = useState(false);
@@ -181,24 +200,22 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
   }, []);
 
   const syncPending = useCallback(() => {
-    if (!online) return;
+    if (!online) {
+      toast.info(resolvedLanguage === "en-US" ? "You're offline. Nothing was sent." : resolvedLanguage === "es-ES" ? "Estás sin conexión. No se envió nada." : resolvedLanguage === "ar" ? "أنت غير متصل. لم يتم إرسال أي شيء." : "Você está offline. Nada foi enviado.");
+      return;
+    }
     const pending = queue.filter((item) => item.status === "pending" || item.status === "failed");
-    if (!pending.length) return;
-    const ids = pending.map((item) => item.id);
-    setQueue((current) => current.map((item) => ids.includes(item.id) ? { ...item, status: "syncing" } : item));
-    window.setTimeout(() => setQueue((current) => current.map((item) => ids.includes(item.id) ? { ...item, status: "synced" } : item)), 850);
-  }, [online, queue, setQueue]);
-
-  useEffect(() => { if (online) syncPending(); }, [online, syncPending]);
-
-  const addToQueue = useCallback((title: string, kind: SyncItem["kind"]) => {
-    const id = `${kind}:${title.trim().toLocaleLowerCase("pt-BR")}`;
-    setQueue((current) => {
-      if (current.some((item) => item.id === id && item.status !== "failed")) return current;
-      return [{ id, title, kind, status: online ? "syncing" : "pending", createdAt: new Date().toISOString() }, ...current];
-    });
-    if (online) window.setTimeout(() => setQueue((current) => current.map((item) => item.id === id ? { ...item, status: "synced" } : item)), 850);
-  }, [online, setQueue]);
+    if (!pending.length) {
+      toast.info(resolvedLanguage === "en-US" ? "No pending actions in the local queue." : resolvedLanguage === "es-ES" ? "No hay acciones pendientes en la cola local." : resolvedLanguage === "ar" ? "لا توجد إجراءات معلقة في قائمة الانتظار المحلية." : "Não há ações pendentes na fila local.");
+      return;
+    }
+    setQueue((current) => current.map((item) =>
+      pending.some((pendingItem) => pendingItem.id === item.id)
+        ? { ...item, status: "failed" }
+        : item
+    ));
+    toast.warning(resolvedLanguage === "en-US" ? "This local queue is not connected to server-side actions yet. Nothing was changed." : resolvedLanguage === "es-ES" ? "Esta cola local aún no está conectada a acciones del servidor. No se modificó nada." : resolvedLanguage === "ar" ? "قائمة الانتظار المحلية غير متصلة بإجراءات الخادم بعد. لم يتم تغيير أي شيء." : "Essa fila local ainda não está conectada às ações do servidor. Nada foi alterado.");
+  }, [online, queue, setQueue, resolvedLanguage]);
 
   const appendMessage = (from: ChatMessage["from"], text: string, category?: AssistantCategory) => setMessages((current) => [...current, { id: makeId("message"), from, text, time: "agora", category }]);
 
@@ -209,6 +226,36 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
     appendMessage("user", text);
     setCommand("");
     setAgentStatus("thinking");
+    const leadRequest = parseLeadCreationRequest(text, resolvedLanguage);
+    if (leadRequest) {
+      if ("missing" in leadRequest) {
+        const ask = resolvedLanguage === "en-US"
+          ? "I can prepare the lead, but I need the contact's full name and phone number. Send both in one message."
+          : resolvedLanguage === "es-ES"
+            ? "Puedo preparar el lead, pero necesito el nombre completo y el teléfono del contacto. Envíame ambos en un mensaje."
+            : resolvedLanguage === "ar"
+              ? "يمكنني تجهيز العميل المحتمل، لكن أحتاج إلى الاسم الكامل ورقم الهاتف. أرسل كليهما في رسالة واحدة."
+              : "Posso preparar o lead, mas preciso do nome completo e do telefone do contato. Envie os dois na mesma mensagem.";
+        respond(ask, "comercial");
+        requestInFlightRef.current = false;
+        return;
+      }
+      if (!access.can("manageCustomers")) {
+        respond(resolvedLanguage === "en-US" ? "Your role cannot create leads." : resolvedLanguage === "es-ES" ? "Tu rol no puede crear leads." : resolvedLanguage === "ar" ? "لا تسمح صلاحيات دورك بإنشاء العملاء المحتملين." : "Seu cargo não tem permissão para criar leads.", "comercial");
+        requestInFlightRef.current = false;
+        return;
+      }
+      setPendingAction({
+        title: resolvedLanguage === "en-US" ? `Create lead: ${leadRequest.data.name}` : resolvedLanguage === "es-ES" ? `Crear lead: ${leadRequest.data.name}` : resolvedLanguage === "ar" ? `إنشاء عميل محتمل: ${leadRequest.data.name}` : `Criar lead: ${leadRequest.data.name}`,
+        description: `${leadRequest.data.name} · ${leadRequest.data.phone}`,
+        kind: "action",
+        category: "comercial",
+        payload: leadRequest,
+      });
+      respond(resolvedLanguage === "en-US" ? "I prepared this lead. Check the details and confirm to save it to your company's records." : resolvedLanguage === "es-ES" ? "Preparé este lead. Revisa los datos y confirma para guardarlo en los registros de tu empresa." : resolvedLanguage === "ar" ? "جهزت بيانات العميل المحتمل. راجع التفاصيل وأكد لحفظها في سجلات شركتك." : "Preparei esse lead. Confira os dados e confirme para salvá-lo nos registros da sua empresa.", "comercial");
+      requestInFlightRef.current = false;
+      return;
+    }
     if (!online) {
       respond("Para consultar os dados atuais da empresa, conecte-se à internet e tente novamente.", "sistema");
       requestInFlightRef.current = false;
@@ -225,7 +272,7 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
         return;
       }
       const { data, error } = await supabase.functions.invoke<{ answer?: string; error?: string }>("assistente-ia", {
-        body: { message: text, history },
+        body: { message: text, history, language: resolvedLanguage },
         headers: {
           apikey: supabasePublishableKey,
           Authorization: `Bearer ${sessionData.session.access_token}`,
@@ -263,10 +310,35 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
     }
   };
 
-  const confirmAction = () => {
+  const confirmAction = async () => {
     if (!pendingAction) return;
-    addToQueue(pendingAction.title, "action");
-    respond(online ? "Ação autorizada e enviada para a fila do Toldo Pro.\nRegistro protegido pelas permissões atuais do usuário.\nPróxima ação: acompanhar a sincronização na fila." : "Ação autorizada e salva localmente.\nO registro permanece protegido no aparelho até a conexão voltar.\nPróxima ação: sincronizar a fila quando estiver online.", pendingAction.category);
+    if (pendingAction.payload?.entity === "leads") {
+      if (!access.can("manageCustomers")) {
+        respond(resolvedLanguage === "en-US" ? "Your role no longer has permission to create leads." : resolvedLanguage === "es-ES" ? "Tu rol ya no tiene permiso para crear leads." : resolvedLanguage === "ar" ? "لم تعد صلاحيات دورك تسمح بإنشاء العملاء المحتملين." : "Seu cargo não tem mais permissão para criar leads.", "comercial");
+        setPendingAction(null);
+        return;
+      }
+      if (!supabase) { toast.error("O serviço de dados não está configurado."); return; }
+      const payload = pendingAction.payload;
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) { toast.error("Sua sessão expirou. Entre novamente."); return; }
+      const { error } = await supabase.from("operational_records").insert({
+        company_id: access.companyId,
+        entity: "leads",
+        record_id: String(payload.data.id),
+        data: payload.data,
+      });
+      if (error) {
+        console.error("Lead creation failed", error.message);
+        toast.error(resolvedLanguage === "en-US" ? "The lead could not be saved. Check your permissions and try again." : resolvedLanguage === "es-ES" ? "No se pudo guardar el lead. Comprueba los permisos e inténtalo de nuevo." : resolvedLanguage === "ar" ? "تعذر حفظ العميل المحتمل. تحقق من الأذونات وحاول مرة أخرى." : "Não foi possível salvar o lead. Confira suas permissões e tente novamente.");
+        return;
+      }
+      respond(resolvedLanguage === "en-US" ? `Lead ${payload.data.name} was saved successfully.` : resolvedLanguage === "es-ES" ? `El lead ${payload.data.name} se guardó correctamente.` : resolvedLanguage === "ar" ? `تم حفظ العميل المحتمل ${payload.data.name} بنجاح.` : `Lead ${payload.data.name} salvo com sucesso.`, "comercial");
+      setPendingAction(null);
+      toast.success(resolvedLanguage === "en-US" ? "Lead saved" : resolvedLanguage === "es-ES" ? "Lead guardado" : resolvedLanguage === "ar" ? "تم الحفظ" : "Lead salvo");
+      return;
+    }
+    respond(resolvedLanguage === "en-US" ? "This action is not connected to a live operation yet. Nothing was changed." : resolvedLanguage === "es-ES" ? "Esta acción aún no está conectada a una operación real. No se modificó nada." : resolvedLanguage === "ar" ? "هذا الإجراء غير متصل بعملية فعلية بعد. لم يتم تغيير أي شيء." : "Esta ação ainda não está conectada a uma operação real. Nada foi alterado.", pendingAction.category);
     setPendingAction(null);
   };
 
@@ -283,7 +355,7 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
       return;
     }
     const recognition = new Recognition();
-    recognition.lang = "pt-BR";
+    recognition.lang = resolvedLanguage;
     recognition.interimResults = false;
     recognition.continuous = false;
     recognition.onresult = (event) => { setCommand(event.results[0][0].transcript); setAgentStatus("idle"); };
@@ -329,17 +401,17 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
     <div className="mx-auto min-h-screen max-w-[1180px]">
       <header className={`sticky top-0 z-30 border-b backdrop-blur-xl ${dark ? "border-white/10 bg-[#0f2033]/90" : "border-[#e4ebf3]/90 bg-[#f4f7fb]/90"}`}>
         <div className="flex h-[68px] items-center justify-between px-4 sm:px-7">
-          <div className="flex items-center gap-2.5"><LogoMark /><div><p className={`font-display text-[15px] font-extrabold tracking-[-0.04em] ${dark ? "text-white" : "text-[#17324d]"}`}>toldo<span className="text-[#f47b20]">pro</span></p><p className={`text-[8px] font-bold uppercase tracking-[0.18em] ${dark ? "text-[#91aac3]" : "text-[#8da0b4]"}`}>agente de campo</p></div></div>
-          <div className="flex items-center gap-1.5"><StatusPill online={online} pending={pendingCount} /><button onClick={() => { setShowQueue(true); syncPending(); }} className={dark ? "flex h-9 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/10 px-2.5 text-white" : "flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#dce8e1] bg-[#f0fbf6] px-2.5 text-[#16805a]"} aria-label="Sincronizar agora"><RefreshCw size={15} className={pendingCount > 0 ? "animate-spin" : ""} /><span className="hidden text-[10px] font-bold sm:inline">Sincronizar</span></button><button onClick={() => setDark((value) => !value)} className={dark ? "hidden h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-[#f8bf7b] sm:flex" : "hidden h-9 w-9 items-center justify-center rounded-xl border border-[#e0e8f0] bg-white text-[#6d829a] sm:flex"} aria-label="Alternar modo escuro">{dark ? <Sun size={16} /> : <Moon size={16} />}</button><button onClick={() => setShowProfile(true)} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e8b99d] text-[10px] font-extrabold text-[#75432f]" aria-label="Abrir perfil">{initials}</button></div>
+          <div className="flex items-center gap-2.5"><LogoMark /><div><p className={`font-display text-[15px] font-extrabold tracking-[-0.04em] ${dark ? "text-white" : "text-[#17324d]"}`}>toldo<span className="text-[#f47b20]">pro</span></p><p className={`text-[8px] font-bold uppercase tracking-[0.18em] ${dark ? "text-[#91aac3]" : "text-[#8da0b4]"}`}>{resolvedLanguage === "en-US" ? "field assistant" : resolvedLanguage === "es-ES" ? "asistente de campo" : resolvedLanguage === "ar" ? "مساعد ميداني" : "agente de campo"}</p></div></div>
+          <div className="flex items-center gap-1.5"><LanguageSwitcher compact /><StatusPill online={online} pending={pendingCount} /><button onClick={() => { setShowQueue(true); syncPending(); }} className={dark ? "flex h-9 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/10 px-2.5 text-white" : "flex h-9 items-center justify-center gap-1.5 rounded-xl border border-[#dce8e1] bg-[#f0fbf6] px-2.5 text-[#16805a]"} aria-label="Sincronizar agora"><RefreshCw size={15} className={pendingCount > 0 ? "animate-spin" : ""} /><span className="hidden text-[10px] font-bold sm:inline">{t("assistant.sync")}</span></button><button onClick={() => setDark((value) => !value)} className={dark ? "hidden h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-[#f8bf7b] sm:flex" : "hidden h-9 w-9 items-center justify-center rounded-xl border border-[#e0e8f0] bg-white text-[#6d829a] sm:flex"} aria-label="Alternar modo escuro">{dark ? <Sun size={16} /> : <Moon size={16} />}</button><button onClick={() => setShowProfile(true)} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e8b99d] text-[10px] font-extrabold text-[#75432f]" aria-label="Abrir perfil">{initials}</button></div>
         </div>
       </header>
 
       <main className="px-4 pb-[112px] pt-6 sm:px-7 sm:pt-8">
-        <section className="mb-6 flex items-end justify-between gap-4"><div><p className={`mb-2 text-[11px] font-bold ${dark ? "text-[#a4bbcf]" : "text-[#8194a9]"}`}>{new Date().toLocaleDateString("pt-BR", { dateStyle: "full" })} <span className="mx-1 text-[#f47b20]">·</span> {access.companyName}</p><h1 className={`font-display text-[28px] font-extrabold tracking-[-0.06em] sm:text-[34px] ${dark ? "text-white" : "text-[#17324d]"}`}>Olá, <span className="text-[#f47b20]">{userName}.</span></h1><p className={`mt-2 max-w-[420px] text-[13px] leading-5 ${dark ? "text-[#a4bbcf]" : "text-[#71859c]"}`}>Converse com a IA sobre as informações que seu cargo pode acessar.</p></div><button onClick={installApp} className="hidden items-center gap-2 rounded-xl bg-[#17324d] px-3 py-2 text-[10px] font-bold text-white shadow-[0_8px_18px_rgba(23,50,77,0.16)] sm:flex"><Plus size={14} /> Instalar app</button></section>
+        <section className="mb-6 flex items-end justify-between gap-4"><div><p className={`mb-2 text-[11px] font-bold ${dark ? "text-[#a4bbcf]" : "text-[#8194a9]"}`}>{new Date().toLocaleDateString("pt-BR", { dateStyle: "full" })} <span className="mx-1 text-[#f47b20]">·</span> {access.companyName}</p><h1 className={`font-display text-[28px] font-extrabold tracking-[-0.06em] sm:text-[34px] ${dark ? "text-white" : "text-[#17324d]"}`}>Olá, <span className="text-[#f47b20]">{userName}.</span></h1><p className={`mt-2 max-w-[420px] text-[13px] leading-5 ${dark ? "text-[#a4bbcf]" : "text-[#71859c]"}`}>{t("assistant.subtitle")}</p></div><button onClick={installApp} className="hidden items-center gap-2 rounded-xl bg-[#17324d] px-3 py-2 text-[10px] font-bold text-white shadow-[0_8px_18px_rgba(23,50,77,0.16)] sm:flex"><Plus size={14} /> Instalar app</button></section>
 
         {!isInstalled && <section className={dark ? "mb-5 flex items-center gap-3 rounded-[20px] border border-white/10 bg-[#172d44] p-3" : "mb-5 flex items-center gap-3 rounded-[20px] border border-[#f5d7bf] bg-[#fff8f3] p-3"}><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f47b20] text-white"><Download size={17} /></div><div className="min-w-0 flex-1"><p className={dark ? "text-[11px] font-extrabold text-white" : "text-[11px] font-extrabold text-[#6b341b]"}>Instale o Toldo Pro IA no celular</p><p className={dark ? "mt-1 text-[10px] leading-4 text-[#a4bbcf]" : "mt-1 text-[10px] leading-4 text-[#9b6a4f]"}>Android: menu ⋮ e “Instalar app”. iPhone: Compartilhar e “Adicionar à Tela de Início”.</p></div><button onClick={installApp} className="shrink-0 rounded-xl bg-[#f47b20] px-3 py-2 text-[10px] font-extrabold text-white">Instalar</button></section>}
 
-        <section className="mb-7 grid gap-3 md:grid-cols-[1.15fr_.85fr]"><div className="overflow-hidden rounded-[24px] bg-[#17324d] p-5 text-white shadow-[0_16px_36px_rgba(23,50,77,0.15)] sm:p-6"><div className="flex items-start justify-between gap-4"><div><div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#a7bdd2]"><Sparkles size={14} className="text-[#f6a05b]" /> Assistente operacional</div><h2 className="max-w-[400px] font-display text-[22px] font-extrabold leading-tight tracking-[-0.05em] sm:text-[26px]">O que você precisa resolver agora?</h2><p className="mt-3 max-w-[390px] text-[12px] leading-5 text-[#b6c7d8]">Converse em linguagem natural e consulte os dados da empresa liberados para seu cargo.</p></div><div className="hidden h-12 w-12 items-center justify-center rounded-2xl bg-[#f47b20] sm:flex"><Headphones size={21} /></div></div><div className="mt-5 flex flex-wrap gap-2"><button onClick={() => send("O que tenho agendado para amanhã?")} className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-[10px] font-bold text-white transition hover:bg-white/15">Agenda de amanhã</button><button onClick={() => send("Há materiais abaixo do estoque mínimo?")} className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-[10px] font-bold text-white transition hover:bg-white/15">Estoque baixo</button></div></div><div className={`rounded-[24px] border p-5 shadow-[0_10px_25px_rgba(35,67,101,0.05)] ${dark ? "border-white/10 bg-[#172d44]" : "border-[#e4ebf3] bg-white"}`}><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#eaf8f3] text-[#15835e]"><CalendarDays size={17} /></div><div><p className={`text-[11px] font-bold ${dark ? "text-white" : "text-[#516980]"}`}>Resumo da agenda</p><p className={`mt-0.5 text-[10px] ${dark ? "text-[#94abc1]" : "text-[#9aabba]"}`}>Registros disponíveis para seu cargo</p></div></div><span className="rounded-full bg-[#fff2e8] px-2 py-1 text-[9px] font-bold text-[#d76a21]">{agendaItems.length} registros</span></div><div className="mt-4 space-y-3">{agendaItems.map((item) => <button key={item.time + item.title} onClick={() => onNavigate("instalacoes")} className={`flex w-full items-center gap-3 rounded-2xl p-2 text-left ${dark ? "hover:bg-white/5" : "hover:bg-[#f7f9fc]"}`}><span className="w-10 text-[11px] font-extrabold text-[#f47b20]">{item.time}</span><span className={`flex h-8 w-8 items-center justify-center rounded-xl ${item.tone}`}><Wrench size={14} /></span><span className="min-w-0 flex-1"><span className={`block truncate text-[11px] font-bold ${dark ? "text-white" : "text-[#35506a]"}`}>{item.title}</span><span className={`mt-0.5 block truncate text-[10px] ${dark ? "text-[#94abc1]" : "text-[#95a6b6]"}`}>{item.meta}</span></span><ChevronRight size={14} className={dark ? "text-[#68839c]" : "text-[#c4d0dc]"} /></button>)}{!agendaItems.length && <p className="py-4 text-center text-[10px] text-[#91a2b2]">Nenhum registro operacional disponível nesta área.</p>}</div><button onClick={() => onNavigate(access.can("manageAgenda") ? "agenda" : "instalacoes")} className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl bg-[#f5f8fb] py-2.5 text-[10px] font-bold text-[#3567ae]">Abrir agenda completa <ChevronRight size={13} /></button></div></section>
+        <section className="mb-7 grid gap-3 md:grid-cols-[1.15fr_.85fr]"><div className="overflow-hidden rounded-[24px] bg-[#17324d] p-5 text-white shadow-[0_16px_36px_rgba(23,50,77,0.15)] sm:p-6"><div className="flex items-start justify-between gap-4"><div><div className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#a7bdd2]"><Sparkles size={14} className="text-[#f6a05b]" /> Assistente operacional</div><h2 className="max-w-[400px] font-display text-[22px] font-extrabold leading-tight tracking-[-0.05em] sm:text-[26px]">{t("assistant.prompt")}</h2><p className="mt-3 max-w-[390px] text-[12px] leading-5 text-[#b6c7d8]">{t("assistant.description")}</p></div><div className="hidden h-12 w-12 items-center justify-center rounded-2xl bg-[#f47b20] sm:flex"><Headphones size={21} /></div></div><div className="mt-5 flex flex-wrap gap-2"><button onClick={() => send("O que tenho agendado para amanhã?")} className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-[10px] font-bold text-white transition hover:bg-white/15">Agenda de amanhã</button><button onClick={() => send("Há materiais abaixo do estoque mínimo?")} className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-[10px] font-bold text-white transition hover:bg-white/15">Estoque baixo</button></div></div><div className={`rounded-[24px] border p-5 shadow-[0_10px_25px_rgba(35,67,101,0.05)] ${dark ? "border-white/10 bg-[#172d44]" : "border-[#e4ebf3] bg-white"}`}><div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#eaf8f3] text-[#15835e]"><CalendarDays size={17} /></div><div><p className={`text-[11px] font-bold ${dark ? "text-white" : "text-[#516980]"}`}>{t("assistant.calendar")}</p><p className={`mt-0.5 text-[10px] ${dark ? "text-[#94abc1]" : "text-[#9aabba]"}`}>Registros disponíveis para seu cargo</p></div></div><span className="rounded-full bg-[#fff2e8] px-2 py-1 text-[9px] font-bold text-[#d76a21]">{agendaItems.length} registros</span></div><div className="mt-4 space-y-3">{agendaItems.map((item) => <button key={item.time + item.title} onClick={() => onNavigate("instalacoes")} className={`flex w-full items-center gap-3 rounded-2xl p-2 text-left ${dark ? "hover:bg-white/5" : "hover:bg-[#f7f9fc]"}`}><span className="w-10 text-[11px] font-extrabold text-[#f47b20]">{item.time}</span><span className={`flex h-8 w-8 items-center justify-center rounded-xl ${item.tone}`}><Wrench size={14} /></span><span className="min-w-0 flex-1"><span className={`block truncate text-[11px] font-bold ${dark ? "text-white" : "text-[#35506a]"}`}>{item.title}</span><span className={`mt-0.5 block truncate text-[10px] ${dark ? "text-[#94abc1]" : "text-[#95a6b6]"}`}>{item.meta}</span></span><ChevronRight size={14} className={dark ? "text-[#68839c]" : "text-[#c4d0dc]"} /></button>)}{!agendaItems.length && <p className="py-4 text-center text-[10px] text-[#91a2b2]">Nenhum registro operacional disponível nesta área.</p>}</div><button onClick={() => onNavigate(access.can("manageAgenda") ? "agenda" : "instalacoes")} className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl bg-[#f5f8fb] py-2.5 text-[10px] font-bold text-[#3567ae]">{t("assistant.openCalendar")} <ChevronRight size={13} /></button></div></section>
 
         <section className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3"><div className={dark ? "rounded-[18px] border border-white/10 bg-[#172d44] p-3" : "rounded-[18px] border border-[#e4ebf3] bg-white p-3 shadow-[0_7px_20px_rgba(35,67,101,0.04)]"}><div className="flex items-center gap-2 text-[#d76a21]"><ListChecks size={15} /><span className="text-[9px] font-extrabold uppercase tracking-[0.12em]">Pendências</span></div><p className={dark ? "mt-2 font-display text-[20px] font-extrabold text-white" : "mt-2 font-display text-[20px] font-extrabold text-[#17324d]"}>{pendingCount}</p><p className={dark ? "text-[9px] text-[#9ab0c4]" : "text-[9px] text-[#91a2b2]"}>{latestQueue[0]?.title || "Sem operações pendentes"}</p></div>{access.can("manageStock") && <div className={dark ? "rounded-[18px] border border-white/10 bg-[#172d44] p-3" : "rounded-[18px] border border-[#e4ebf3] bg-white p-3 shadow-[0_7px_20px_rgba(35,67,101,0.04)]"}><div className="flex items-center gap-2 text-[#15835e]"><Package size={15} /><span className="text-[9px] font-extrabold uppercase tracking-[0.12em]">Estoque baixo</span></div><p className={dark ? "mt-2 font-display text-[20px] font-extrabold text-white" : "mt-2 font-display text-[20px] font-extrabold text-[#17324d]"}>{lowStockCount}</p><p className={dark ? "text-[9px] text-[#9ab0c4]" : "text-[9px] text-[#91a2b2]"}>materiais abaixo do mínimo</p></div>}{access.can("viewFinancial") && <div className={dark ? "rounded-[18px] border border-white/10 bg-[#172d44] p-3" : "rounded-[18px] border border-[#e4ebf3] bg-white p-3 shadow-[0_7px_20px_rgba(35,67,101,0.04)]"}><div className="flex items-center gap-2 text-[#7351c7]"><Wallet size={15} /><span className="text-[9px] font-extrabold uppercase tracking-[0.12em]">A receber</span></div><p className={dark ? "mt-2 font-display text-[16px] font-extrabold text-white" : "mt-2 font-display text-[16px] font-extrabold text-[#17324d]"}>R$ {openReceivables.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p><p className={dark ? "text-[9px] text-[#9ab0c4]" : "text-[9px] text-[#91a2b2]"}>lançamentos não recebidos</p></div>}</section>
 

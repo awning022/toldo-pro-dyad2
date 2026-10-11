@@ -1,0 +1,4 @@
+# Substitua ia.seudominio.com por um domínio seu apontado para o IP do servidor.
+ia.seudominio.com {
+    reverse_proxy 127.0.0.1:8080
+}
