@@ -109,18 +109,21 @@ const categoryLabels: Record<AssistantCategory, string> = {
 
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-function parseLeadCreationRequest(raw: string) {
+function parseLeadCreationRequest(raw: string, language: string) {
   const normalized = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
-  const asksToCreate = /\b(create|add|register|crie|criar|cadastre|cadastrar|registre|registrar|crear|registra)\b/.test(normalized);
-  const mentionsLead = /\b(lead|leads|prospect|prospects)\b/.test(normalized);
+  const arabicAction = /(أنشئ|إنشاء|سجل|أضف|إضافة)/u.test(raw);
+  const asksToCreate = /\b(create|add|register|crie|criar|cadastre|cadastrar|registre|registrar|crear|registra)\b/.test(normalized) || arabicAction;
+  const mentionsLead = /\b(lead|leads|prospect|prospects)\b/.test(normalized) || /عميل محتمل/u.test(raw);
   if (!asksToCreate || !mentionsLead) return null;
   const phoneMatch = raw.match(/(?:\+?\d[\d\s().-]{7,}\d)/);
-  const nameMatch = raw.match(/\b(?:para|for|to)\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*(?:\s+[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*){0,3})/i);
-  const name = nameMatch?.[1]?.replace(/[,.!?;:]+$/, "").trim();
+  const nameMatch = raw.match(/\b(?:para|for|to)\s+([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,3})/iu)
+    || raw.match(/(?:اسم|باسم)\s+([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,3})/u);
+  const name = nameMatch?.[1]?.replace(/[,.!?;:،]+$/, "").trim();
   const phone = phoneMatch?.[0]?.trim().replace(/\s{2,}/g, " ");
   if (!name || !phone) return { missing: !name && !phone ? "both" : !name ? "name" : "phone" } as const;
   const id = crypto.randomUUID();
-  return { entity: "leads" as const, data: { id, name, phone, stage: "Novo contato", status: "Novo contato", source: "IA Toldo Pro", createdAt: new Date().toISOString() } };
+  const stage = language === "en-US" ? "New contact" : language === "es-ES" ? "Nuevo contacto" : language === "ar" ? "جهة اتصال جديدة" : "Novo contato";
+  return { entity: "leads" as const, data: { id, name, phone, stage, status: stage, source: "IA Toldo Pro", createdAt: new Date().toISOString() } };
 }
 
 function useStored<T>(key: string, initial: T) {
@@ -223,7 +226,7 @@ export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps)
     appendMessage("user", text);
     setCommand("");
     setAgentStatus("thinking");
-    const leadRequest = parseLeadCreationRequest(text);
+    const leadRequest = parseLeadCreationRequest(text, resolvedLanguage);
     if (leadRequest) {
       if ("missing" in leadRequest) {
         const ask = resolvedLanguage === "en-US"
