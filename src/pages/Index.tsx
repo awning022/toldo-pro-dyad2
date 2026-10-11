@@ -97,6 +97,7 @@ const pipeline = [
 ];
 
 function DashboardView({ onModuleChange, access }: { onModuleChange: (module: ModuleKey) => void; access: CompanyAccess }) {
+  const { t, resolvedLanguage } = useAppLanguage();
   const [, setDismissed] = useState<string[]>([]);
   const { records: companyNotifications, setRecords: setCompanyNotifications } = useCompanyRecords<AppNotification>("notifications", { enabled: access.can("readNotifications") });
   const { records: customers } = useCompanyRecords<WorkflowClient>("customers", { enabled: access.can("manageCustomers") });
@@ -160,7 +161,7 @@ function DashboardView({ onModuleChange, access }: { onModuleChange: (module: Mo
     return { dia: key, atividades: count };
   });
   if (access.companyId) return <div className="space-y-5">
-    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#8d9aaa]">{new Date().toLocaleDateString("pt-BR", { dateStyle: "full" })}</p><h1 className="font-display text-[28px] font-bold text-[#172b4d]">Olá, <span className="text-[#f47b20]">{access.fullName.split(" ")[0]}.</span></h1><p className="mt-2 text-[13px] text-[#708096]">Resumo atualizado de {access.companyName}.</p></div>{access.can("manageQuotes") && <Button onClick={() => onModuleChange("orcamentos")} className="h-10 rounded-xl bg-[#f47b20] text-[11px] font-bold text-white"><Plus size={16} /> Novo orçamento</Button>}</div>
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mb-2 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#8d9aaa]">{new Date().toLocaleDateString(resolvedLanguage, { dateStyle: "full" })}</p><h1 className="font-display text-[28px] font-bold text-[#172b4d]">{t("dashboard.greeting")}, <span className="text-[#f47b20]">{access.fullName.split(" ")[0]}.</span></h1><p className="mt-2 text-[13px] text-[#708096]">{t("dashboard.summary")} {access.companyName}.</p></div>{access.can("manageQuotes") && <Button onClick={() => onModuleChange("orcamentos")} className="h-10 rounded-xl bg-[#f47b20] text-[11px] font-bold text-white"><Plus size={16} /> {t("dashboard.newQuote")}</Button>}</div>
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">{visibleMetrics.map(({ label, value, helper, icon: Icon, tone }) => <div key={label} className="group rounded-[20px] border border-[#e9edf3] bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#d9e3ef] hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none"><span className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}><Icon size={18} /></span><p className="mt-4 text-[12px] text-[#708096]">{label}</p><p className="mt-1 font-display text-[23px] font-extrabold text-[#172b4d]">{value}</p><p className="mt-1 text-[10px] text-[#9aa6b6]">{helper}</p></div>)}</div>
     <div className="grid gap-5 xl:grid-cols-[1.35fr_.9fr]">
       <section className="group relative overflow-hidden rounded-[24px] border border-white/80 bg-white p-5 shadow-[0_14px_40px_rgba(23,43,77,0.07)] transition duration-500 hover:-translate-y-1 hover:shadow-[0_22px_50px_rgba(23,43,77,0.12)] motion-reduce:transform-none motion-reduce:transition-none sm:p-6">
