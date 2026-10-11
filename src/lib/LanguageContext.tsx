@@ -16,6 +16,7 @@ const dictionaries: Record<ResolvedLanguage, Record<string, string>> = {
     "assistant.greeting":"Olá","assistant.subtitle":"Converse com a IA sobre as informações que seu cargo pode acessar.",
     "assistant.prompt":"O que você precisa resolver agora?","assistant.description":"Converse em linguagem natural e consulte os dados da empresa liberados para seu cargo.",
     "assistant.calendar":"Resumo da agenda","assistant.openCalendar":"Abrir agenda completa","assistant.install":"Instalar app","assistant.sync":"Sincronizar",
+    "dashboard.greeting":"Olá","dashboard.summary":"Resumo atualizado de","dashboard.newQuote":"Novo orçamento",
   },
   "en-US": {
     "nav.overview":"Overview","nav.operation":"Operations","nav.management":"Management","nav.technology":"Technology",
@@ -26,6 +27,7 @@ const dictionaries: Record<ResolvedLanguage, Record<string, string>> = {
     "assistant.greeting":"Hello","assistant.subtitle":"Ask the AI about information your role is allowed to access.",
     "assistant.prompt":"What do you need to solve right now?","assistant.description":"Chat naturally and consult company data available to your role.",
     "assistant.calendar":"Schedule summary","assistant.openCalendar":"Open full calendar","assistant.install":"Install app","assistant.sync":"Sync",
+    "dashboard.greeting":"Hello","dashboard.summary":"Updated overview for","dashboard.newQuote":"New quote",
   },
   "es-ES": {
     "nav.overview":"Resumen","nav.operation":"Operaciones","nav.management":"Gestión","nav.technology":"Tecnología",
@@ -36,6 +38,7 @@ const dictionaries: Record<ResolvedLanguage, Record<string, string>> = {
     "assistant.greeting":"Hola","assistant.subtitle":"Consulta a la IA sobre la información a la que tu rol tiene acceso.",
     "assistant.prompt":"¿Qué necesitas resolver ahora?","assistant.description":"Habla con naturalidad y consulta los datos de la empresa disponibles para tu rol.",
     "assistant.calendar":"Resumen de agenda","assistant.openCalendar":"Abrir agenda completa","assistant.install":"Instalar app","assistant.sync":"Sincronizar",
+    "dashboard.greeting":"Hola","dashboard.summary":"Resumen actualizado de","dashboard.newQuote":"Nuevo presupuesto",
   },
   ar: {
     "nav.overview":"نظرة عامة","nav.operation":"العمليات","nav.management":"الإدارة","nav.technology":"التقنية",
@@ -46,6 +49,7 @@ const dictionaries: Record<ResolvedLanguage, Record<string, string>> = {
     "assistant.greeting":"مرحباً","assistant.subtitle":"تحدث مع الذكاء الاصطناعي حول المعلومات التي يسمح دورك بالوصول إليها.",
     "assistant.prompt":"ما الذي تريد إنجازه الآن؟","assistant.description":"تحدث بشكل طبيعي واطلع على بيانات الشركة المتاحة لدورك.",
     "assistant.calendar":"ملخص الجدول","assistant.openCalendar":"فتح الجدول الكامل","assistant.install":"تثبيت التطبيق","assistant.sync":"مزامنة",
+    "dashboard.greeting":"مرحباً","dashboard.summary":"ملخص محدث لـ","dashboard.newQuote":"عرض سعر جديد",
   },
 };
 
