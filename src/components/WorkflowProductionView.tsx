@@ -114,11 +114,15 @@ export function WorkflowProductionView({ onModuleChange }: WorkflowViewProps) {
   const changeStatus = (item: WorkflowProduction, status: ProductionStatus) => {
     if (!canWorkflow(role, "changeProductionStatus")) return toast.error("Seu perfil não pode alterar o status da produção.");
     if (item.status === status) return;
+    if (status === "Pronto para instalar" && !item.history.some((entry) => entry.action.startsWith("Material utilizado:"))) {
+      return toast.error("Registre os materiais consumidos no estoque antes de liberar a produção para instalação.");
+    }
     setConfirmation({ title: "Alterar status da produção", description: `${item.id} · ${item.clientName}`, detail: `Status atual: ${item.status}\nNovo status: ${status}\nA alteração ficará registrada com usuário, data e origem.`, confirmLabel: "Confirmar alteração", onConfirm: () => { setProductions((current) => current.map((entry) => entry.id === item.id ? { ...entry, status, history: [...entry.history, makeHistory("Status da produção alterado", "Tela de Produção", item.status, status)] } : entry)); toast.success("Status de produção atualizado"); } });
   };
   const sendToInstallation = async (item: WorkflowProduction) => {
     if (!canWorkflow(role, "changeProductionStatus")) return toast.error("Seu perfil não pode enviar para instalação.");
     if (item.status !== "Pronto para instalar") return toast.error("A produção precisa estar 'Pronto para instalar' antes de enviar para instalação.");
+    if (!item.history.some((entry) => entry.action.startsWith("Material utilizado:"))) return toast.error("Registre os materiais consumidos antes de enviar para instalação.");
     const installationId = nextId("INST", installations);
     const { data, error } = await supabase.rpc("send_production_to_installation", {
       p_production_id: item.id,
