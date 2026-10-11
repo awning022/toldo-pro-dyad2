@@ -22,6 +22,7 @@ import {
   Mail,
   Menu,
   MessageSquare,
+  Bot,
   MoreHorizontal,
   Plus,
   Search,
@@ -70,6 +71,7 @@ const navGroups = [
     { label: "Relatórios", module: "relatorios" as ModuleKey, icon: FileBarChart },
   ] },
   { label: "Tecnologia", items: [
+    { label: "IA Toldo Pro / WhatsApp", module: "whatsapp" as ModuleKey, icon: Bot },
     { label: "Configurações", module: "configuracoes" as ModuleKey, icon: Settings },
   ] },
 ];
