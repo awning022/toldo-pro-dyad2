@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowRight,
+  BarChart3,
   Bell,
   Bot,
   Boxes,
