@@ -64,15 +64,13 @@ const server = http.createServer(async (req, res) => {
   if (typeof input.system !== "string" || !Array.isArray(input.messages) || input.messages.length < 1 || input.messages.length > 12) {
     return send(res, 400, { error: "invalid_chat_payload" });
   }
-  const messages = input.messages.map((item) => {
-    if (!item || !["user", "assistant"].includes(item.role) || typeof item.content !== "string") {
-      throw new Error("INVALID_MESSAGE");
-    }
-    return { role: item.role, content: item.content.slice(0, 8000) };
-  });
-  if (messages.some((item) => item.content.length > 8000)) {
-    return send(res, 400, { error: "message_too_long" });
+  if (input.messages.some((item) => !item || !["user", "assistant"].includes(item.role) || typeof item.content !== "string")) {
+    return send(res, 400, { error: "invalid_message" });
   }
+  const messages = input.messages.map((item) => ({
+    role: item.role,
+    content: item.content.slice(0, 8000),
+  }));
 
   try {
     const response = await fetch(`${OLLAMA_URL}/api/chat`, {
