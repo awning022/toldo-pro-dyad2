@@ -143,7 +143,7 @@ function SectionTitle({ eyebrow, title, action, onAction, dark = false }: { eyeb
 }
 
 export function AgentMobile({ access, onNavigate, onSignOut }: AgentMobileProps) {
-  const { language, resolvedLanguage, t } = useAppLanguage();
+  const { resolvedLanguage, t } = useAppLanguage();
   const userName = access.fullName.split(" ")[0] || access.email;
   const [online, setOnline] = useState(() => navigator.onLine);
   const [dark, setDark] = useState(false);
