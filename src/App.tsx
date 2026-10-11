@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthGate } from "@/components/AuthGate";
 import { AuthCallbackPage, ChangeEmailPage, ForgotPasswordPage, ResetPasswordPage } from "@/components/AuthFlows";
 import Index from "./pages/Index";
-import IA from "./pages/IA";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
