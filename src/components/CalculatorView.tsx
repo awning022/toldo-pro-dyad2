@@ -219,13 +219,15 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
         stocks.forEach((stock, stockIndex) => stock.free.forEach((free, freeIndex) => {
           const fits = rect.width <= free.width + 0.000001 && rect.length <= free.length + 0.000001;
           const rotates = rect.length <= free.width + 0.000001 && rect.width <= free.length + 0.000001;
+          const currentBest = best as { stockIndex: number; freeIndex: number; rotated: boolean; score: number } | null;
           if (fits) {
             const score = free.width * free.length - rect.width * rect.length;
-            if (!best || score < best.score) best = { stockIndex, freeIndex, rotated: false, score };
+            if (!currentBest || score < currentBest.score) best = { stockIndex, freeIndex, rotated: false, score };
           }
+          const latestBest = best as { stockIndex: number; freeIndex: number; rotated: boolean; score: number } | null;
           if (rotates) {
             const score = free.width * free.length - rect.width * rect.length + 0.0000001;
-            if (!best || score < best.score) best = { stockIndex, freeIndex, rotated: true, score };
+            if (!latestBest || score < latestBest.score) best = { stockIndex, freeIndex, rotated: true, score };
           }
         }));
         if (!best) {
@@ -239,8 +241,9 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
         const placedWidth = chosen.rotated ? rect.length : rect.width;
         const placedLength = chosen.rotated ? rect.width : rect.length;
         stock.usedArea += placedWidth * placedLength;
-        const rightWidth = free.width - placedWidth;
-        const bottomLength = free.length - placedLength;
+        const kerf = number(rule.kerf);
+        const rightWidth = Math.max(0, free.width - placedWidth - kerf);
+        const bottomLength = Math.max(0, free.length - placedLength - kerf);
         if (rightWidth > 0.02 && placedLength > 0) stock.free.push({ width: rightWidth, length: placedLength });
         if (bottomLength > 0.02 && free.width > 0) stock.free.push({ width: free.width, length: bottomLength });
       });
@@ -281,6 +284,7 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
   const estimatedProfit = suggestedPrice - totalCost - suggestedPrice * tax;
   if (denominator <= 0) warnings.push("A soma da margem e dos impostos precisa ser menor que 100% para calcular o preço sugerido.");
   if (!model.materials.length) warnings.push("Cadastre os materiais e as regras de consumo deste modelo.");
+  if (model.materials.some((item) => number(item.stockPrice) <= 0)) warnings.push("Há materiais com preço cheio zerado. Preencha os preços comerciais na ficha técnica para que o orçamento e o valor das sobras sejam confiáveis.");
   return { materials: materialResults, purchaseCost, scrapValue, consumedCost, laborCost: number(laborCost), extraCost: number(extraCost), totalCost, marginPercent: number(marginPercent), taxPercent: number(taxPercent), suggestedPrice, estimatedProfit, warnings };
 }
 
