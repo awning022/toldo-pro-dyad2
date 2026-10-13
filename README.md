@@ -1,37 +1,45 @@
 # Toldo Pro
 
-Application for managing customers, quotes, work orders, production, installations, inventory, finance, and company access.
+Sistema de gestão para empresas de toldos: clientes e CRM, contatos e vendas, orçamentos, calculadora de materiais e sobras, ordens de serviço, produção, instalações, estoque, financeiro, relatórios, agenda, notificações e gestão de equipe/permissões.
 
-## Supabase setup
+A aplicação usa React + Vite no frontend e Supabase para autenticação, banco de dados e isolamento dos dados por empresa. A versão atual não inclui assistente de IA.
 
-1. Create a Supabase project and configure its authentication email templates and site/redirect URLs for the deployed app.
-2. Copy `.env.example` to `.env.local` and set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from the project API settings. `VITE_SUPABASE_ANON_KEY` accepts the project's publishable key (`sb_publishable_...`); both settings are public frontend values. Never put a secret/service-role key or Gemini key in a `VITE_` variable.
-3. Apply all migrations in order with the Supabase CLI:
+## Configuração do Supabase
 
+1. Crie um projeto Supabase e configure os modelos de e-mail e as URLs de autenticação.
+2. Copie `.env.example` para `.env.local` e configure:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY` (chave pública/publishable do projeto).
+   
+   Nunca coloque uma chave `service_role` ou outro segredo em variáveis `VITE_`.
+3. Aplique as migrações na ordem:
    ```sh
-   supabase link --project-ref YOUR_PROJECT_REF
+   supabase link --project-ref SEU_PROJECT_REF
    supabase db push
    ```
-
-   The migration sequence is `001` through `006`; `004` adds permission-scoped contextual search for the assistant, `005` keeps the employee profile email synchronized after a confirmed Auth email change, and `006` provisions company signup atomically.
-
-4. In Supabase **Project Settings → Edge Functions → Secrets**, set `GEMINI_API_KEY` (required for chat), optional `GEMINI_MODEL`, and `APP_URL` (set this to the production Vercel origin after the Vercel project has a domain). Keep these server-only; never add them to `.env.local`, Vercel frontend variables, or any `VITE_` variable. Then deploy the Edge Functions:
-
+   A sequência de migrações `001` a `006` mantém o histórico e a estrutura de banco exigida pelo aplicativo.
+4. Configure o segredo `APP_URL` nas Edge Functions do Supabase com a origem pública da aplicação. Publique somente a função de convite de funcionários:
    ```sh
    supabase functions deploy invite-employee
-   supabase functions deploy assistente-ia
    ```
+   O Supabase fornece os segredos padrão usados pela função. Não configure chave de provedor de IA para esta aplicação.
+5. Para publicar o frontend, conecte o repositório a uma hospedagem compatível com Vite. Comando de build: `pnpm build`; diretório gerado: `dist`. Configure `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` no ambiente de build.
+6. Em **Supabase → Authentication → URL Configuration**, defina a URL pública da aplicação como Site URL e permita o callback `<origem-da-aplicacao>/auth/confirm`, além das URLs locais e de preview que realmente utilizar.
 
-   Supabase provides the standard `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` function secrets. Edge Functions use the Deno `supabase-js` import directly, so no Node server package is required. `APP_URL` is used in employee invitation links.
+## Autenticação e empresas
 
-5. In Vercel, import/link this repository as a Vite project. The existing `vercel.json` rewrites application routes to `index.html`. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Vercel project's Development, Preview, and Production environments using the values from Supabase **Project Settings → API**. Do not add `GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, or any other server secret to Vercel frontend variables. Redeploy after adding or changing the public variables.
-6. In Supabase **Authentication → URL Configuration**, set the production Vercel origin as the Site URL and allow the exact callback URL `<production-origin>/auth/confirm` (plus local and only the Preview callback URLs you use). Signup confirmation, password recovery, employee invitations, and email changes all return through `/auth/confirm`; the app then routes to `/`, `/?setup=1`, `/auth/reset-password`, or `/auth/change-email` as appropriate. Set the Supabase function secret `APP_URL` to the production Vercel origin so employee invitations return to the deployed app.
+Administradores criam a conta e confirmam o e-mail pelo Supabase Auth. O gatilho de autenticação cria perfil, empresa e associação de administrador de forma atômica. O aplicativo usa `company_members` como tabela de associação. Convites de funcionários e alterações de permissões seguem os caminhos autorizados pelo backend. Os dados das empresas são protegidos por Row Level Security (RLS) e funções de banco.
 
-New company administrators register through the app and confirm their email through Supabase Auth. The Auth database trigger creates their profile, company, and administrator membership in one transaction; it sends no email itself. Supabase Auth sends the confirmation after successful user creation. The app uses `company_members` as its canonical membership table (do not create a parallel `company_users` table). Members can read only their own membership row; the team directory and membership updates use company-admin-authorized database paths. Employees are invited from the team area and set and confirm their password from the email link. Password recovery requires the user to open the recovery link and save a new password in the app. Email changes are submitted from the account email button and take effect after confirmation by Supabase Auth. Configure the Supabase Auth email templates and SMTP/provider settings for your deployment; successful frontend requests alone do not confirm actual email delivery. Company data and sensitive operations are protected by Supabase row-level security and database functions; the app requires migrations `001` through `006`.
-
-## Local development
+## Desenvolvimento local
 
 ```sh
 corepack pnpm install
 corepack pnpm dev
-```
+``
+
+Para validar o projeto antes de publicar:
+
+```sh
+corepack pnpm build
+corepack pnpm lint
+``
