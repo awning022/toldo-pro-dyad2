@@ -41,12 +41,13 @@ import { Input } from "@/components/ui/input";
 import { OperationalView } from "@/components/OperationalViews";
 import { WorkflowView } from "@/components/WorkflowViews";
 import { InventoryView } from "@/components/InventoryView";
+import { CalculatorView } from "@/components/CalculatorView";
 import { InstallationsView as WorkflowInstallationsView } from "@/components/InstallationsView";
 import { toast } from "sonner";
 import { useCompanyRecords } from "@/lib/useCompanyRecords";
 import type { WorkflowQuote } from "@/lib/workflowData";
 
-export type ModuleKey = "painel" | "agenda" | "notificacoes" | "crm" | "clientes" | "vendas" | "orcamentos" | "os" | "operacao" | "estoque" | "instalacoes" | "financeiro" | "relatorios" | "equipe" | "gestao" | "configuracoes";
+export type ModuleKey = "painel" | "agenda" | "notificacoes" | "crm" | "clientes" | "vendas" | "orcamentos" | "os" | "operacao" | "estoque" | "instalacoes" | "calculadora" | "financeiro" | "relatorios" | "equipe" | "gestao" | "configuracoes";
 type ModuleViewProps = { module: ModuleKey; onModuleChange: (module: ModuleKey) => void };
 type StatCardProps = { label: string; value: string; helper: string; icon: LucideIcon; tone: string };
 type Field = { id: string; label: string; placeholder: string; type?: string; required?: boolean };
@@ -228,6 +229,7 @@ export function ModuleView({ module, onModuleChange }: ModuleViewProps) {
   if (module === "vendas") return <SalesView />;
   if (module === "clientes" || module === "orcamentos" || module === "os" || module === "operacao" || module === "equipe" || module === "gestao") return <WorkflowView module={module} onModuleChange={onModuleChange} />;
   if (module === "agenda" || module === "notificacoes" || module === "financeiro" || module === "relatorios" || module === "configuracoes") return <OperationalView module={module} onModuleChange={onModuleChange} />;
+  if (module === "calculadora") return <CalculatorView />;
   if (module === "estoque") return <InventoryView />;
   if (module === "instalacoes") return <WorkflowInstallationsView />;
   return null;
