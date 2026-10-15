@@ -89,11 +89,12 @@ const defaultModels: CalculatorModel[] = [
     description: "Modelo inicial para cobertura fixa. A divisão em painéis é uma estimativa de corte; revise perfis, emendas e folgas técnicas.",
     defaultWidth: 5, defaultDepth: 3, crossbarSpacing: 0.7, createdAt: "", updatedAt: "",
     materials: [
-      { ...newMaterial("Chapa de policarbonato"), id: "fix-chapa", type: "sheet", stockLength: 6, stockWidth: 2.1, formulaA: "depth", formulaB: "width", count: 1, kerf: 0.003 },
-      { ...newMaterial("Perfil estrutural frontal"), id: "fix-frontal", type: "linear", stockLength: 6, formulaA: "width", count: 1 },
-      { ...newMaterial("Perfis laterais"), id: "fix-lateral", type: "linear", stockLength: 6, formulaA: "depth", count: 2 },
-      { ...newMaterial("Travessas de apoio (fixação até a frente)"), id: "fix-travessas", type: "linear", stockLength: 6, formulaA: "depth", count: 1, spacingBased: true },
-      { ...newMaterial("Calha"), id: "fix-calha", type: "linear", stockLength: 6, formulaA: "width", count: 1 },
+      { ...newMaterial("Policarbonato alveolar 6 mm fumê"), id: "fix-chapa", type: "sheet", stockLength: 6, stockWidth: 2.1, formulaA: "width", formulaB: "depth", count: 1, kerf: 0.003 },
+      { ...newMaterial("Perfil traseiro de alumínio"), id: "fix-traseiro", type: "linear", stockLength: 6, formulaA: "width", count: 1 },
+      { ...newMaterial("Perfil frontal de alumínio"), id: "fix-frontal", type: "linear", stockLength: 6, formulaA: "width", count: 1 },
+      { ...newMaterial("Travessas de alumínio (da parede até a frente)"), id: "fix-travessas", type: "linear", stockLength: 6, formulaA: "depth", count: 1, spacingBased: true },
+      { ...newMaterial("Perfis laterais de alumínio"), id: "fix-lateral", type: "linear", stockLength: 6, formulaA: "depth", count: 2 },
+      { ...newMaterial("Calha frontal"), id: "fix-calha", type: "linear", stockLength: 6, formulaA: "width", count: 1 },
       { ...newMaterial("Parafusos e acessórios"), id: "fix-paraf", type: "unit", stockLength: 1, stockWidth: 0, formulaA: "fixed", fixedA: 1, count: 12, kerf: 0 },
     ],
   },
@@ -375,9 +376,34 @@ export function CalculatorView() {
 
   const fixedTemplate = defaultModels.find((model) => model.id === "preset-fixo-policarbonato")!;
   useEffect(() => {
-    if (!modelsReady || !canEditModels || models.some((model) => model.id === fixedTemplate.id)) return;
+    if (!modelsReady || !canEditModels) return;
+    const existing = models.find((model) => model.id === fixedTemplate.id);
     const now = new Date().toISOString();
-    setModels([...models, { ...fixedTemplate, createdAt: now, updatedAt: now, materials: fixedTemplate.materials.map((material) => ({ ...material })) }]);
+    if (!existing) {
+      setModels([...models, { ...fixedTemplate, createdAt: now, updatedAt: now, materials: fixedTemplate.materials.map((material) => ({ ...material })) }]);
+      return;
+    }
+    // Atualiza a ficha técnica padrão sem apagar preços e dimensões comerciais que a empresa já configurou.
+    const existingById = new Map(existing.materials.map((material) => [material.id, material]));
+    const migratedMaterials = fixedTemplate.materials.map((templateMaterial) => {
+      const saved = existingById.get(templateMaterial.id);
+      if (!saved) return { ...templateMaterial };
+      existingById.delete(templateMaterial.id);
+      return {
+        ...templateMaterial,
+        name: templateMaterial.name,
+        stockPrice: saved.stockPrice,
+        stockLength: saved.stockLength || templateMaterial.stockLength,
+        stockWidth: saved.stockWidth || templateMaterial.stockWidth,
+      };
+    });
+    // Mantém materiais personalizados que a empresa tenha adicionado.
+    migratedMaterials.push(...existingById.values());
+    if (JSON.stringify(existing.materials) !== JSON.stringify(migratedMaterials) || existing.crossbarSpacing == null) {
+      setModels(models.map((model) => model.id === fixedTemplate.id
+        ? { ...model, name: fixedTemplate.name, crossbarSpacing: model.crossbarSpacing ?? fixedTemplate.crossbarSpacing, materials: migratedMaterials, updatedAt: now }
+        : model));
+    }
   }, [modelsReady, canEditModels, models, setModels]);
 
   const selectedModel = models.find((model) => model.id === fixedTemplate.id) || fixedTemplate;
