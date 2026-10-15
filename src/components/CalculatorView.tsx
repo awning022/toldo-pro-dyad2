@@ -58,7 +58,7 @@ type CalculatorProject = {
 };
 type Scrap = { material: string; type: MaterialType; measure: string; length: number; width: number; quantity: number; value: number; source: string };
 type MaterialResult = { name: string; type: MaterialType; needed: string; purchased: string; purchasedCost: number; usedCost: number; scrapValue: number; scraps: Scrap[]; notes: string[] };
-type CalculationResult = { materials: MaterialResult[]; purchaseCost: number; scrapValue: number; consumedCost: number; laborCost: number; extraCost: number; totalCost: number; marginPercent: number; taxPercent: number; suggestedPrice: number; estimatedProfit: number; warnings: string[] };
+type CalculationResult = { materials: MaterialResult[]; purchaseCost: number; scrapValue: number; consumedCost: number; laborCost: number; extraCost: number; totalCost: number; marginPercent: number; taxPercent: number; suggestedPrice: number; estimatedProfit: number; warnings: string[]; blocked?: boolean };
 
 const dimensionOptions: { value: DimensionFormula; label: string }[] = [
   { value: "width", label: "Largura do projeto" },
@@ -132,6 +132,7 @@ function resolveDimension(formula: DimensionFormula, width: number, depth: numbe
 
 function calculateProject(model: CalculatorModel, width: number, depth: number, quantity: number, laborCost: number, extraCost: number, marginPercent: number, taxPercent: number): CalculationResult {
   const warnings: string[] = [];
+  let blocked = false;
   const groups = new Map<string, { rule: MaterialRule; linearPieces: number[]; rectangles: { width: number; length: number }[]; units: number }>();
   const safeQuantity = Math.max(1, Math.floor(quantity));
   model.materials.forEach((rule) => {
@@ -162,7 +163,8 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
           const maxAcross = rule.stockWidth;
           const maxAlong = rule.stockLength;
           if (pieceLength > maxAlong + 0.000001) {
-            warnings.push(rule.name + ": o avanço da peça (" + meters(pieceLength) + ") excede o comprimento comercial (" + meters(maxAlong) + "). Não foi criada emenda; ajuste a chapa comercial ou as medidas.");
+            blocked = true;
+            warnings.push(rule.name + ": o avanço da peça (" + meters(pieceLength) + ") excede o comprimento comercial (" + meters(maxAlong) + "). Não foi criada emenda; o preço final foi bloqueado. Ajuste a chapa comercial ou as medidas.");
             continue;
           }
           const widthCuts = Math.ceil(pieceWidth / maxAcross);
@@ -191,14 +193,16 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
     let purchased = "";
     if (rule.type === "linear") {
       if (rule.stockLength <= 0) {
+        blocked = true;
         warnings.push("Informe o comprimento comercial do material " + rule.name + ".");
         return;
       }
       const bars: { remaining: number; pieces: number }[] = [];
       linearPieces.sort((a, b) => b - a).forEach((piece) => {
         if (piece > rule.stockLength + 0.000001) {
-          warnings.push(rule.name + ": corte de " + meters(piece) + " maior que a barra comercial de " + meters(rule.stockLength) + ".");
-          notes.push("Uma ou mais peças não cabem em uma barra comercial.");
+          blocked = true;
+          warnings.push(rule.name + ": corte de " + meters(piece) + " maior que a barra comercial de " + meters(rule.stockLength) + ". Não é permitido emendar a peça; ajuste a medida ou o perfil comercial.");
+          notes.push("Uma ou mais peças não cabem em uma barra comercial; o preço final foi bloqueado.");
           return;
         }
         let target = bars.find((bar) => bar.remaining + 0.000001 >= piece + (bar.pieces > 0 ? number(rule.kerf) : 0));
@@ -231,6 +235,7 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
       });
     } else if (rule.type === "sheet") {
       if (rule.stockLength <= 0 || rule.stockWidth <= 0) {
+        blocked = true;
         warnings.push("Informe as dimensões comerciais da chapa/rolo " + rule.name + ".");
         return;
       }
@@ -304,10 +309,10 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
   const denominator = 1 - margin - tax;
   const suggestedPrice = denominator > 0 ? totalCost / denominator : totalCost;
   const estimatedProfit = suggestedPrice - totalCost - suggestedPrice * tax;
-  if (denominator <= 0) warnings.push("A soma da margem e dos impostos precisa ser menor que 100% para calcular o preço sugerido.");
+  if (denominator <= 0) { blocked = true; warnings.push("A soma da margem e dos impostos precisa ser menor que 100% para calcular o preço sugerido."); }
   if (!model.materials.length) warnings.push("Cadastre os materiais e as regras de consumo deste modelo.");
   if (model.materials.some((item) => number(item.stockPrice) <= 0)) warnings.push("Há materiais com preço cheio zerado. Preencha os preços comerciais na ficha técnica para que o orçamento e o valor das sobras sejam confiáveis.");
-  return { materials: materialResults, purchaseCost, scrapValue, consumedCost, laborCost: number(laborCost), extraCost: number(extraCost), totalCost, marginPercent: number(marginPercent), taxPercent: number(taxPercent), suggestedPrice, estimatedProfit, warnings };
+  return { materials: materialResults, purchaseCost, scrapValue, consumedCost, laborCost: number(laborCost), extraCost: number(extraCost), totalCost, marginPercent: number(marginPercent), taxPercent: number(taxPercent), suggestedPrice, estimatedProfit, warnings, blocked };
 }
 
 function ThreeDPreview({ model, width, depth, heightDrop, quantity }: { model: CalculatorModel; width: number; depth: number; heightDrop: number; quantity: number }) {
@@ -456,6 +461,7 @@ export function CalculatorView() {
   };
   const saveProject = () => {
     if (parsedWidth <= 0 || parsedDepth <= 0) { toast.error("Informe a largura e o avanço em metros."); return; }
+    if (result.blocked) { toast.error("O cálculo está bloqueado porque há material que não cabe sem emenda ou uma regra de preço inválida. Corrija os avisos antes de salvar."); return; }
     if (!priceConfigured) { toast.error("Preencha o preço comercial de todos os materiais na aba Configuração antes de salvar o orçamento."); setActiveTab("settings"); return; }
     const project: CalculatorProject = {
       id: uid(), name: projectName.trim() || "Cobertura fixa", modelId: selectedModel.id, modelName: selectedModel.name,
@@ -517,7 +523,7 @@ export function CalculatorView() {
           <Metric label="Material para comprar" value={money(result.purchaseCost)} helper="Custo total dos itens comerciais" icon={Package} />
           <Metric label="Sobras estimadas" value={money(result.scrapValue)} helper="Valor proporcional de retalhos aproveitáveis" icon={Scissors} />
           <Metric label="Custo estimado usado" value={money(result.totalCost)} helper="Material consumido + custos opcionais" icon={CircleDollarSign} />
-          <Metric label="Preço sugerido" value={priceConfigured ? money(result.suggestedPrice) : "Configure os preços"} helper={priceConfigured ? "Margem configurada: " + parsedMargin + "%" : "Não é exibido como valor confiável"} icon={Calculator} />
+          <Metric label="Preço sugerido" value={result.blocked ? "Corrija os avisos" : priceConfigured ? money(result.suggestedPrice) : "Configure os preços"} helper={priceConfigured ? "Margem configurada: " + parsedMargin + "%" : "Não é exibido como valor confiável"} icon={Calculator} />
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-bold text-slate-900">2. Lista de materiais</h2><p className="mt-1 text-xs text-slate-500">Estimativa gerada pelas regras cadastradas na configuração.</p></div><Package className="text-orange-600" size={21} /></div>
@@ -530,7 +536,7 @@ export function CalculatorView() {
           </div>
           {result.warnings.length > 0 && <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="flex items-center gap-2 text-sm font-semibold text-amber-900"><AlertTriangle size={16} /> Atenção</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-800">{result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
         </div>
-        <div className="rounded-2xl bg-slate-900 p-5 text-white"><p className="text-xs text-slate-300">Resumo</p><div className="mt-3 space-y-2 text-sm"><div className="flex justify-between gap-3"><span>Compra dos materiais</span><span>{money(result.purchaseCost)}</span></div><div className="flex justify-between gap-3"><span>Valor estimado das sobras</span><span>- {money(result.scrapValue)}</span></div><div className="flex justify-between gap-3"><span>Mão de obra e extras</span><span>{money(configuredLabor + configuredExtras)}</span></div><div className="border-t border-slate-700 pt-3"><div className="flex justify-between gap-3 font-bold"><span>Preço sugerido</span><span>{priceConfigured ? money(result.suggestedPrice) : "Pendente de configuração"}</span></div><p className="mt-1 text-xs text-slate-400">Preço estimado com margem de {parsedMargin}% e impostos de {configuredTax}%.</p></div></div></div>
+        <div className="rounded-2xl bg-slate-900 p-5 text-white"><p className="text-xs text-slate-300">Resumo</p><div className="mt-3 space-y-2 text-sm"><div className="flex justify-between gap-3"><span>Compra dos materiais</span><span>{money(result.purchaseCost)}</span></div><div className="flex justify-between gap-3"><span>Valor estimado das sobras</span><span>- {money(result.scrapValue)}</span></div><div className="flex justify-between gap-3"><span>Mão de obra e extras</span><span>{money(configuredLabor + configuredExtras)}</span></div><div className="border-t border-slate-700 pt-3"><div className="flex justify-between gap-3 font-bold"><span>Preço sugerido</span><span>{result.blocked ? "Cálculo bloqueado" : priceConfigured ? money(result.suggestedPrice) : "Pendente de configuração"}</span></div><p className="mt-1 text-xs text-slate-400">Preço estimado com margem de {parsedMargin}% e impostos de {configuredTax}%.</p></div></div></div>
       </section>
     </div>}
 
