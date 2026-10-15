@@ -389,12 +389,11 @@ export function CalculatorView() {
     }
     // Atualiza a ficha técnica padrão sem apagar preços e dimensões comerciais que a empresa já configurou.
     const existingById = new Map(existing.materials.map((material) => [material.id, material]));
-    const oldFront = existingById.get("fix-frontal");
-    const oldBars = existingById.get("fix-travessas");
-    const oldBack = existingById.get("fix-traseiro");
+    const legacyProfileOptions = [existingById.get("fix-frontal"), existingById.get("fix-travessas"), existingById.get("fix-traseiro")].filter(Boolean) as MaterialRule[];
+    const legacyProfile = legacyProfileOptions.find((item) => number(item.stockPrice) > 0) || legacyProfileOptions[0];
     const migratedMaterials = fixedTemplate.materials.map((templateMaterial) => {
       let saved = existingById.get(templateMaterial.id);
-      if (templateMaterial.id === "fix-perfil-principal") saved = oldFront || oldBars || oldBack || saved;
+      if (templateMaterial.id === "fix-perfil-principal") saved = legacyProfile || saved;
       if (!saved) return { ...templateMaterial };
       existingById.delete(templateMaterial.id);
       return {
@@ -510,7 +509,7 @@ export function CalculatorView() {
         <div className="grid gap-3 sm:grid-cols-2">
           <Metric label="Material para comprar" value={money(result.purchaseCost)} helper="Custo total dos itens comerciais" icon={Package} />
           <Metric label="Sobras estimadas" value={money(result.scrapValue)} helper="Valor proporcional de retalhos aproveitáveis" icon={Scissors} />
-          <Metric label="Custo estimado usado" value={money(result.consumedCost + number(laborCost) + number(extraCost))} helper="Material consumido + custos opcionais" icon={CircleDollarSign} />
+          <Metric label="Custo estimado usado" value={money(result.totalCost)} helper="Material consumido + custos opcionais" icon={CircleDollarSign} />
           <Metric label="Preço sugerido" value={priceConfigured ? money(result.suggestedPrice) : "Configure os preços"} helper={priceConfigured ? "Margem configurada: " + parsedMargin + "%" : "Não é exibido como valor confiável"} icon={Calculator} />
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -524,7 +523,7 @@ export function CalculatorView() {
           </div>
           {result.warnings.length > 0 && <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="flex items-center gap-2 text-sm font-semibold text-amber-900"><AlertTriangle size={16} /> Atenção</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-800">{result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
         </div>
-        <div className="rounded-2xl bg-slate-900 p-5 text-white"><p className="text-xs text-slate-300">Resumo</p><div className="mt-3 space-y-2 text-sm"><div className="flex justify-between gap-3"><span>Compra dos materiais</span><span>{money(result.purchaseCost)}</span></div><div className="flex justify-between gap-3"><span>Valor estimado das sobras</span><span>- {money(result.scrapValue)}</span></div><div className="flex justify-between gap-3"><span>Mão de obra e extras</span><span>{money(number(laborCost) + number(extraCost))}</span></div><div className="border-t border-slate-700 pt-3"><div className="flex justify-between gap-3 font-bold"><span>Preço sugerido</span><span>{priceConfigured ? money(result.suggestedPrice) : "Pendente de configuração"}</span></div><p className="mt-1 text-xs text-slate-400">Preço estimado com margem de {parsedMargin}%, sem impostos adicionados.</p></div></div></div>
+        <div className="rounded-2xl bg-slate-900 p-5 text-white"><p className="text-xs text-slate-300">Resumo</p><div className="mt-3 space-y-2 text-sm"><div className="flex justify-between gap-3"><span>Compra dos materiais</span><span>{money(result.purchaseCost)}</span></div><div className="flex justify-between gap-3"><span>Valor estimado das sobras</span><span>- {money(result.scrapValue)}</span></div><div className="flex justify-between gap-3"><span>Mão de obra e extras</span><span>{money(configuredLabor + configuredExtras)}</span></div><div className="border-t border-slate-700 pt-3"><div className="flex justify-between gap-3 font-bold"><span>Preço sugerido</span><span>{priceConfigured ? money(result.suggestedPrice) : "Pendente de configuração"}</span></div><p className="mt-1 text-xs text-slate-400">Preço estimado com margem de {parsedMargin}% e impostos de {configuredTax}%.</p></div></div></div>
       </section>
     </div>}
 
