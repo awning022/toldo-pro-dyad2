@@ -73,7 +73,7 @@ function Toolbar({ query, setQuery, filter, setFilter, filters }: { query: strin
 }
 
 function AgendaModule({ onModuleChange }: { onModuleChange: (module: ModuleKey) => void }) {
-  const { records: events, setRecords: setEvents } = useCompanyRecords<EventRecord>("events");
+  const { records: events, setRecords: setEvents } = useCompanyRecords<EventRecord>("agenda");
   const [view, setView] = useState("Dia");
   const [filter, setFilter] = useState("Todos");
   const [query, setQuery] = useState("");
