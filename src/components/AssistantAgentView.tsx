@@ -28,6 +28,10 @@ function actionLabel(action: AgentAction) {
     create_customer: "Cadastrar cliente",
     create_lead: "Cadastrar oportunidade",
     create_finance: "Lançar movimento financeiro",
+    create_work_order: "Emitir ordem de serviço",
+    create_installation: "Agendar instalação",
+    update_production_status: "Atualizar status da produção",
+    update_installation_status: "Atualizar status da instalação",
   };
   return labels[action.type] || "Confirmar ação";
 }
