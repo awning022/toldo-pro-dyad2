@@ -17,24 +17,33 @@ export function InstallationsView() {
   const [useFor, setUseFor] = useState<WorkflowInstallation | null>(null);
   const [requestFor, setRequestFor] = useState<WorkflowInstallation | null>(null);
   const persist = (next: WorkflowInstallation[]) => setInstallations(next);
-  const advance = (installation: WorkflowInstallation) => {
+  const advance = async (installation: WorkflowInstallation) => {
     const statuses: WorkflowInstallation["status"][] = ["Agendada", "A caminho", "Instalando", "Concluída"];
     const nextStatus = statuses[Math.min(statuses.indexOf(installation.status) + 1, statuses.length - 1)];
     if (installation.status === "Concluída") return;
     if (nextStatus === "Concluída") return finish(installation);
-    persist(installations.map((item) => item.id === installation.id
+    const saved = await persist(installations.map((item) => item.id === installation.id
       ? { ...item, status: nextStatus, history: [...item.history, makeHistory("Status da instalação atualizado", "Tela de Instalações", installation.status, nextStatus)] }
       : item));
+    if (saved) toast.success("Status da instalação atualizado");
   };
   const [finishingId, setFinishingId] = useState<string | null>(null);
   const finish = async (installation: WorkflowInstallation) => {
-    if (finishingId) return;
-    if (!Array.isArray(installation.materials) || installation.materials.length === 0) {
-      toast.error("Registre os materiais utilizados e dê baixa no estoque antes de concluir a instalação.");
-      return;
-    }
+    if (finishingId || !supabase || !access.companyId) return;
     setFinishingId(installation.id);
     try {
+      await reloadInstallations();
+      const { data: latestRow, error: latestError } = await supabase.from("operational_records")
+        .select("data").eq("company_id", access.companyId).eq("entity", "installations").eq("record_id", installation.id).maybeSingle();
+      if (latestError) {
+        toast.error("Não foi possível conferir os materiais registrados.", { description: latestError.message });
+        return;
+      }
+      const latestInstallation = latestRow?.data as WorkflowInstallation | undefined;
+      if (!Array.isArray(latestInstallation?.materials) || latestInstallation.materials.length === 0) {
+        toast.error("Registre os materiais utilizados e dê baixa no estoque antes de concluir a instalação.");
+        return;
+      }
       const { data, error } = await supabase.rpc("complete_installation_and_close_work_order", {
         p_installation_id: installation.id,
       });
