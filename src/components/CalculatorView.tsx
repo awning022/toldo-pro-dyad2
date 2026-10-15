@@ -97,6 +97,7 @@ const defaultModels: CalculatorModel[] = [
       { ...newMaterial("Policarbonato alveolar 6 mm fumê"), id: "fix-chapa", type: "sheet", stockLength: 6, stockWidth: 2.1, formulaA: "width", formulaB: "depth", count: 1, kerf: 0.003, allowRotation: false },
       { ...newMaterial("Perfil principal de alumínio (traseiro, frontal e travessas)"), id: "fix-perfil-principal", type: "linear", stockLength: 6, formulaA: "width", count: 1, kerf: 0 },
       { ...newMaterial("Pés de alumínio (perfil separado)"), id: "fix-pes", type: "linear", stockLength: 6, formulaA: "fixed", fixedA: 2.5, count: 2, kerf: 0.003 },
+      { ...newMaterial("Calha frontal"), id: "fix-calha", type: "linear", stockLength: 6, formulaA: "width", count: 1, kerf: 0.003 },
       { ...newMaterial("Parafusos e acessórios"), id: "fix-paraf", type: "unit", stockLength: 1, stockWidth: 0, formulaA: "fixed", fixedA: 1, count: 12, kerf: 0 },
     ],
   },
@@ -476,7 +477,8 @@ export function CalculatorView() {
     () => calculateProject(selectedModel, parsedWidth, parsedDepth, 1, configuredLabor, configuredExtras, parsedMargin, configuredTax),
     [selectedModel, parsedWidth, parsedDepth, configuredLabor, configuredExtras, parsedMargin, configuredTax],
   );
-  const priceConfigured = selectedModel.materials.length > 0 && selectedModel.materials.every((material) => number(material.stockPrice) > 0);
+  const requiredMaterials = selectedModel.materials.filter((material) => material.id === "fix-perfil-principal" || material.spacingBased || number(material.count) > 0);
+  const priceConfigured = requiredMaterials.length > 0 && requiredMaterials.every((material) => number(material.stockPrice) > 0);
   const fieldClass = "h-10 rounded-xl border-slate-200 bg-white text-sm";
   const labelClass = "mb-1.5 block text-xs font-semibold text-slate-600";
 
