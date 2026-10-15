@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { useLocation } from "react-router-dom";
@@ -190,15 +190,20 @@ export function AuthGate({ children }: { children: (access: CompanyAccess) => Re
     };
   }, [loadAccess]);
 
+  const telemetryRoute = useRef(location.pathname);
+  const telemetryCompanyId = access?.companyId;
+  const telemetryUserId = user?.id;
+  useEffect(() => { telemetryRoute.current = location.pathname; }, [location.pathname]);
+
   useEffect(() => {
-    if (!supabase || !access || !user) return;
+    if (!supabase || !telemetryCompanyId || !telemetryUserId) return;
     let alive = true;
     const sessionStartedAt = Date.now();
     const writeEvent = async (eventType: "session_start" | "heartbeat") => {
       if (!alive) return;
       const { error: telemetryError } = await supabase.from("owner_telemetry").insert({
-        user_id: user.id, company_id: access.companyId, event_type: eventType,
-        route: location.pathname.slice(0, 180),
+        user_id: telemetryUserId, company_id: telemetryCompanyId, event_type: eventType,
+        route: telemetryRoute.current.slice(0, 180),
       });
       if (telemetryError) { /* Telemetry is best-effort and must not block app usage. */ }
     };
@@ -208,31 +213,31 @@ export function AuthGate({ children }: { children: (access: CompanyAccess) => Re
       alive = false;
       window.clearInterval(timer);
       void supabase.from("owner_telemetry").insert({
-        user_id: user.id,
-        company_id: access.companyId,
+        user_id: telemetryUserId,
+        company_id: telemetryCompanyId,
         event_type: "session_end",
-        route: location.pathname.slice(0, 180),
+        route: telemetryRoute.current.slice(0, 180),
         duration_ms: Math.min(600000, Math.max(0, Date.now() - sessionStartedAt)),
       });
     };
-  }, [access?.companyId, user?.id]);
+  }, [telemetryCompanyId, telemetryUserId]);
 
   useEffect(() => {
-    if (!supabase || !access || !user) return;
+    if (!supabase || !telemetryCompanyId || !telemetryUserId) return;
     void supabase.from("owner_telemetry").insert({
-      user_id: user.id, company_id: access.companyId, event_type: "route_view",
-      route: location.pathname.slice(0, 180),
+      user_id: telemetryUserId, company_id: telemetryCompanyId, event_type: "route_view",
+      route: telemetryRoute.current.slice(0, 180),
     });
-  }, [location.pathname, access?.companyId, user?.id]);
+  }, [location.pathname, telemetryCompanyId, telemetryUserId]);
 
   useEffect(() => {
-    if (!supabase || !access || !user) return;
+    if (!supabase || !telemetryCompanyId || !telemetryUserId) return;
     const recordClientError = () => {
       void supabase.from("owner_telemetry").insert({
-        user_id: user.id,
-        company_id: access.companyId,
+        user_id: telemetryUserId,
+        company_id: telemetryCompanyId,
         event_type: "client_error",
-        route: location.pathname.slice(0, 180),
+        route: telemetryRoute.current.slice(0, 180),
       });
     };
     window.addEventListener("error", recordClientError);
@@ -241,7 +246,7 @@ export function AuthGate({ children }: { children: (access: CompanyAccess) => Re
       window.removeEventListener("error", recordClientError);
       window.removeEventListener("unhandledrejection", recordClientError);
     };
-  }, [location.pathname, access?.companyId, user?.id]);
+  }, [telemetryCompanyId, telemetryUserId]);
 
   if (!sessionReady || (user && loading)) return <AccessLoading>Carregando sua sessão e permissões...</AccessLoading>;
   if (setupRequired && user) {
