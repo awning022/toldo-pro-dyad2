@@ -42,12 +42,13 @@ import { OperationalView } from "@/components/OperationalViews";
 import { WorkflowView } from "@/components/WorkflowViews";
 import { InventoryView } from "@/components/InventoryView";
 import { CalculatorView } from "@/components/CalculatorView";
+import { AssistantAgentView } from "@/components/AssistantAgentView";
 import { InstallationsView as WorkflowInstallationsView } from "@/components/InstallationsView";
 import { toast } from "sonner";
 import { useCompanyRecords } from "@/lib/useCompanyRecords";
 import type { WorkflowQuote } from "@/lib/workflowData";
 
-export type ModuleKey = "painel" | "agenda" | "notificacoes" | "crm" | "clientes" | "vendas" | "orcamentos" | "os" | "operacao" | "estoque" | "instalacoes" | "calculadora" | "financeiro" | "relatorios" | "equipe" | "gestao" | "configuracoes";
+export type ModuleKey = "painel" | "agenda" | "notificacoes" | "crm" | "clientes" | "vendas" | "orcamentos" | "os" | "operacao" | "estoque" | "instalacoes" | "calculadora" | "financeiro" | "relatorios" | "equipe" | "gestao" | "configuracoes" | "assistente";
 type ModuleViewProps = { module: ModuleKey; onModuleChange: (module: ModuleKey) => void };
 type StatCardProps = { label: string; value: string; helper: string; icon: LucideIcon; tone: string };
 type Field = { id: string; label: string; placeholder: string; type?: string; required?: boolean };
@@ -225,6 +226,7 @@ function ManagementView() {
 }
 
 export function ModuleView({ module, onModuleChange }: ModuleViewProps) {
+  if (module === "assistente") return <AssistantAgentView />;
   if (module === "crm") return <CRMView />;
   if (module === "vendas") return <SalesView />;
   if (module === "clientes" || module === "orcamentos" || module === "os" || module === "operacao" || module === "equipe" || module === "gestao") return <WorkflowView module={module} onModuleChange={onModuleChange} />;
