@@ -33,6 +33,7 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
   const [records, setState] = useState<T[]>([]);
   const recordsRef = useRef<T[]>([]);
   const persistedRef = useRef<T[]>([]);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
   const [ready, setReady] = useState(false);
   const canViewFinancial = can("viewFinancial");
   const canEditFinance = can("manageFinance");
@@ -221,8 +222,6 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
     return true;
   }, [canEditFinance, canViewFinancial, companyId, enabled, entity]);
 
-  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
-
   const setRecords = useCallback((update: T[] | ((current: T[]) => T[])) => {
     if (!ready) {
       toast.info("Aguarde o carregamento dos registros antes de salvar.");
@@ -244,5 +243,15 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
     });
   }, [ready, save, load]);
 
-  return { records, setRecords, ready, reload: load };
+  const reload = useCallback(async () => {
+    setReady(false);
+    let observedQueue: Promise<void>;
+    do {
+      observedQueue = saveQueueRef.current;
+      await observedQueue.catch(() => undefined);
+    } while (observedQueue !== saveQueueRef.current);
+    await load();
+  }, [load]);
+
+  return { records, setRecords, ready, reload };
 }
