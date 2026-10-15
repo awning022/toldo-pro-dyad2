@@ -31,7 +31,7 @@ Deno.serve(async (request) => {
   const { data: authData, error: authError } = await caller.auth.getUser();
   if (authError || !authData.user) return json(401, { error: "Invalid session" });
 
-  const { data: permitted, error: permissionError } = await caller.rpc("has_company_permission", { permission_key: "editRules" });
+  const { data: permitted, error: permissionError } = await caller.rpc("has_company_permission", { p_permission: "editRules" });
   if (permissionError) return json(500, { error: "Unable to verify company permissions" });
   if (!permitted) return json(403, { error: "Only company administrators can invite employees" });
 
