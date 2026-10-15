@@ -25,6 +25,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Wallet,
+  Users,
   Wrench,
   X,
 } from "lucide-react";
@@ -146,12 +147,13 @@ function ReportsModule() {
 
 function SettingsModule() {
   const access = useCompanyAccess();
+  type UserSettings = { dark: boolean; camera: boolean; gps: boolean; pwa: boolean; sync: boolean; notifications: boolean };
   const settingsKey = `toldo:settings:${access.user.id}`;
-  const [settings, setSettings] = useState(() => {
-    const defaults = { dark: false, camera: true, gps: true, pwa: true, sync: true, notifications: true };
+  const [settings, setSettings] = useState<UserSettings>(() => {
+    const defaults: UserSettings = { dark: false, camera: true, gps: true, pwa: true, sync: true, notifications: true };
     try {
       const saved = window.localStorage.getItem(settingsKey);
-      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+      return saved ? { ...defaults, ...(JSON.parse(saved) as Partial<UserSettings>) } : defaults;
     } catch {
       return defaults;
     }
