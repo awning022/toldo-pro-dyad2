@@ -179,7 +179,28 @@ async function executeAction(client: ReturnType<typeof createClient>, companyId:
       history: [{ id: crypto.randomUUID(), actor: "IA Toldo Pro", role: membership.role, at: now, action: "Orçamento calculado e criado como rascunho", origin: "assistant-agent" }],
     };
     await insertRecord(client, companyId, "quotes", id, quote);
-    return { type: "quote_created", id, title: quote.productModel, measurements: quote.measurements, materialBreakdown: breakdown, purchaseCost: money(result.purchaseCost), totalCost: money(result.totalCost), suggestedPrice: money(result.suggestedPrice), estimatedProfit: money(result.estimatedProfit), warnings: result.warnings, status: "Rascunho" };
+    const projectId = "IA-PROJ-" + crypto.randomUUID().slice(0, 8).toUpperCase();
+    const projectWarnings = [...result.warnings, "Relatório de sobras do agente é simplificado; para aproveitamento exato de retalhos, confira o projeto na Calculadora antes de fabricar."];
+    const projectResult = {
+      materials: result.details.map((item) => ({
+        name: item.name, type: item.type, needed: item.note,
+        purchased: item.stockUnits + " item(ns) comercial(is)",
+        purchasedCost: item.cost, usedCost: item.cost, scrapValue: 0, scraps: [],
+        notes: ["Estimativa do agente baseada na ficha técnica cadastrada; revise cortes e sobras na Calculadora."],
+      })),
+      purchaseCost: result.purchaseCost, scrapValue: 0, consumedCost: result.purchaseCost,
+      laborCost: result.labor, extraCost: result.extra, totalCost: result.totalCost,
+      marginPercent: result.margin, taxPercent: result.tax, suggestedPrice: result.suggestedPrice,
+      estimatedProfit: result.estimatedProfit, warnings: projectWarnings,
+    };
+    await insertRecord(client, companyId, "calculator_projects", projectId, {
+      id: projectId, name: String(d.customerName || "Projeto IA") + " · " + quote.productModel,
+      modelId, modelName: quote.productModel, width, depth, heightDrop: 0.3, quantity,
+      laborCost: labor, extraCost: extra, marginPercent: margin, taxPercent: tax,
+      result: projectResult, createdAt: now,
+    });
+
+    return { type: "quote_created", id, projectId, title: quote.productModel, measurements: quote.measurements, materialBreakdown: breakdown, purchaseCost: money(result.purchaseCost), totalCost: money(result.totalCost), suggestedPrice: money(result.suggestedPrice), estimatedProfit: money(result.estimatedProfit), warnings: projectWarnings, status: "Rascunho" };
   }
 
   if (action.type === "create_customer") {
@@ -328,7 +349,7 @@ Deno.serve(async (req) => {
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "Não foi possível executar a ação." }, 400);
       }
-      const content = result.type === "quote_created" ? "Orçamento " + result.id + " criado como rascunho para " + result.title + ", " + result.measurements + ". Custo estimado: " + result.totalCost + "; preço sugerido: " + result.suggestedPrice + "; lucro estimado: " + result.estimatedProfit + ". Confira a ficha técnica e as observações antes de enviar ao cliente." : result.type === "customer_created" ? "Cliente " + result.name + " cadastrado com o código " + result.id + "." : result.type === "lead_created" ? "Oportunidade " + result.name + " registrada com o código " + result.id + "." : result.type === "finance_created" ? "Lançamento " + result.direction + " criado: " + result.description + ", " + result.value + ", código " + result.id + "." : result.type === "work_order_created" ? "Ordem de serviço " + result.id + " emitida para " + result.customerName + ": " + result.service + ".": result.type === "installation_created" ? "Instalação " + result.id + " agendada para " + result.customer + " em " + result.address + ".": result.type === "production_updated" ? "Status da produção " + result.id + " atualizado para " + result.status + ".": result.type === "installation_updated" ? "Status da instalação " + result.id + " atualizado para " + result.status + ".": "Ação executada com sucesso.";
+      const content = result.type === "quote_created" ? "Orçamento " + result.id + " criado como rascunho para " + result.title + ", " + result.measurements + ". Projeto de cálculo salvo: " + result.projectId + ". Custo estimado: " + result.totalCost + "; preço sugerido: " + result.suggestedPrice + "; lucro estimado: " + result.estimatedProfit + ". O relatório de sobras do agente é simplificado; confira o projeto na Calculadora antes de fabricar ou enviar ao cliente." : result.type === "customer_created" ? "Cliente " + result.name + " cadastrado com o código " + result.id + "." : result.type === "lead_created" ? "Oportunidade " + result.name + " registrada com o código " + result.id + "." : result.type === "finance_created" ? "Lançamento " + result.direction + " criado: " + result.description + ", " + result.value + ", código " + result.id + "." : result.type === "work_order_created" ? "Ordem de serviço " + result.id + " emitida para " + result.customerName + ": " + result.service + ".": result.type === "installation_created" ? "Instalação " + result.id + " agendada para " + result.customer + " em " + result.address + ".": result.type === "production_updated" ? "Status da produção " + result.id + " atualizado para " + result.status + ".": result.type === "installation_updated" ? "Status da instalação " + result.id + " atualizado para " + result.status + ".": "Ação executada com sucesso.";
       await client.from("assistant_messages").insert({ conversation_id: currentConversation, company_id: companyId, user_id: user.id, role: "assistant", content, action: { ...confirmAction, executed: true, result } });
       await client.from("assistant_conversations").update({ updated_at: new Date().toISOString() }).eq("id", currentConversation).eq("company_id", companyId);
       return json({ conversationId: currentConversation, reply: content, result });
