@@ -221,31 +221,34 @@ function WorkflowQuotesView({ onModuleChange }: WorkflowViewProps) {
     window.localStorage.setItem("toldo:workflow-selected-os", order.id);
     toast.info("OS selecionada. Confirme o envio na tela de OS.");
   };
-  const saveQuote = (draft: QuoteDraft) => {
+  const saveQuote = async (draft: QuoteDraft) => {
     if (!String(draft.customerName || "").trim() || !String(draft.productModel || "").trim() || !String(draft.measurements || "").trim() || !String(draft.finalValue || "").trim() || !String(draft.validUntil || "").trim()) {
       toast.error("Preencha cliente, modelo do toldo, medidas, valor final e validade antes de salvar.");
       return;
     }
     if (form === "edit" && selected) {
-      setQuotes((current) => current.map((item) => item.id === selected.id ? { ...item, ...draft, history: [...item.history, makeHistory("Orçamento editado", "Tela de Orçamentos")] } : item));
+      const saved = await setQuotes((current) => current.map((item) => item.id === selected.id ? { ...item, ...draft, history: [...item.history, makeHistory("Orçamento editado", "Tela de Orçamentos")] } : item));
+      if (!saved) return;
       toast.success("Orçamento atualizado");
     } else {
-      const quote: WorkflowQuote = { id: nextId("#", quotes), customerName: String(draft.customerName || "Cliente sem nome"), phone: String(draft.phone || "Não informado"), email: String(draft.email || "Não informado"), address: String(draft.address || "Endereço pendente"), city: String(draft.city || "São Paulo"), taxId: String(draft.taxId || ""), productModel: String(draft.productModel || "Toldo a definir"), measurements: String(draft.measurements || "Medidas pendentes"), materials: String(draft.materials || "Materiais a definir"), color: String(draft.color || "A definir"), finish: String(draft.finish || "A definir"), quantity: Number(draft.quantity || 1), cost: String(draft.cost || "R$ 0"), margin: Number(draft.margin || 0), finalValue: String(draft.finalValue || "R$ 0"), validUntil: String(draft.validUntil || "A definir"), status: "Rascunho", notes: String(draft.notes || ""), history: [makeHistory("Orçamento criado", "Tela de Orçamentos", undefined, "Rascunho")] };
-      setQuotes((current) => [quote, ...current]);
+      const quote: WorkflowQuote = { id: nextId("#", quotes), customerName: String(draft.customerName || "Cliente sem nome"), phone: String(draft.phone || "Não informado"), email: String(draft.email || "Não informado"), address: String(draft.address || "Endereço pendente"), city: String(draft.city || "São Gonçalo"), taxId: String(draft.taxId || ""), productModel: String(draft.productModel || "Toldo a definir"), measurements: String(draft.measurements || "Medidas pendentes"), materials: String(draft.materials || "Materiais a definir"), color: String(draft.color || "A definir"), finish: String(draft.finish || "A definir"), quantity: Number(draft.quantity || 1), cost: String(draft.cost || "R$ 0"), margin: Number(draft.margin || 0), finalValue: String(draft.finalValue || "R$ 0"), validUntil: String(draft.validUntil || "A definir"), status: "Rascunho", notes: String(draft.notes || ""), history: [makeHistory("Orçamento criado", "Tela de Orçamentos", undefined, "Rascunho")] };
+      const saved = await setQuotes((current) => [quote, ...current]);
+      if (!saved) return;
       toast.success("Orçamento criado como rascunho");
     }
     setForm(null);
   };
+  
   const approve = (quote: WorkflowQuote) => {
     if (!canWorkflow(role, "approveQuote")) return toast.error("Seu perfil não pode aprovar orçamentos.");
     if (quote.status === "Aprovado") return toast.info("Orçamento já aprovado.");
     if (quote.status === "Cancelado") return toast.error("Orçamento cancelado não pode ser aprovado.");
-    setConfirmation({ title: "Aprovar orçamento", description: `${quote.id} · ${quote.customerName}`, detail: `Produto: ${quote.productModel}\nMedidas: ${quote.measurements}\nValor final: ${canWorkflow(role, "viewFinancial") ? quote.finalValue : "restrito ao seu perfil"}\nValidade: ${quote.validUntil}\nA aprovação libera a conversão em cliente.`, confirmLabel: "Aprovar orçamento", onConfirm: () => { setQuotes((current) => current.map((item) => item.id === quote.id ? { ...item, status: "Aprovado", history: [...item.history, makeHistory("Orçamento aprovado", "Tela de Orçamentos", item.status, "Aprovado")] } : item)); toast.success("Orçamento aprovado"); } });
+    setConfirmation({ title: "Aprovar orçamento", description: `${quote.id} · ${quote.customerName}`, detail: `Produto: ${quote.productModel}\nMedidas: ${quote.measurements}\nValor final: ${canWorkflow(role, "viewFinancial") ? quote.finalValue : "restrito ao seu perfil"}\nValidade: ${quote.validUntil}\nA aprovação libera a conversão em cliente.`, confirmLabel: "Aprovar orçamento", onConfirm: async () => { const saved = await setQuotes((current) => current.map((item) => item.id === quote.id ? { ...item, status: "Aprovado", history: [...item.history, makeHistory("Orçamento aprovado", "Tela de Orçamentos", item.status, "Aprovado")] } : item)); if (saved) toast.success("Orçamento aprovado"); } });
   };
   const cancel = (quote: WorkflowQuote) => {
     if (!canWorkflow(role, "deleteRecord")) return toast.error("Seu perfil não pode cancelar registros.");
     if (quote.clientId || quote.osId) return toast.error("Orçamento vinculado não pode ser cancelado nesta etapa.");
-    setConfirmation({ title: "Cancelar orçamento", description: `${quote.id} · ${quote.customerName}`, detail: "O registro permanecerá no histórico como cancelado e não poderá seguir para cliente, OS ou produção.", confirmLabel: "Cancelar orçamento", danger: true, onConfirm: () => { setQuotes((current) => current.map((item) => item.id === quote.id ? { ...item, status: "Cancelado", history: [...item.history, makeHistory("Orçamento cancelado", "Tela de Orçamentos", item.status, "Cancelado")] } : item)); toast.success("Orçamento cancelado"); } });
+    setConfirmation({ title: "Cancelar orçamento", description: `${quote.id} · ${quote.customerName}`, detail: "O registro permanecerá no histórico como cancelado e não poderá seguir para cliente, OS ou produção.", confirmLabel: "Cancelar orçamento", danger: true, onConfirm: async () => { const saved = await setQuotes((current) => current.map((item) => item.id === quote.id ? { ...item, status: "Cancelado", history: [...item.history, makeHistory("Orçamento cancelado", "Tela de Orçamentos", item.status, "Cancelado")] } : item)); if (saved) toast.success("Orçamento cancelado"); } });
   };
   return <div><PageHeader eyebrow="Comercial" title="Orçamentos" description="Controle a proposta, a aprovação e a conversão do serviço de toldo sem pular etapas." action="Novo orçamento" onAction={() => setForm("new")} role={role} /><div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4"><SummaryCard label="Total" value={String(quotes.length)} helper="propostas salvas" icon={FileText} tone="bg-[#eaf2ff] text-[#2859a6]" /><SummaryCard label="Aguardando ação" value={String(pending)} helper="rascunhos e enviados" icon={Clock3} tone="bg-[#fff1e7] text-[#d9620d]" /><SummaryCard label="Aprovados" value={String(approved)} helper="prontos para conversão" icon={BadgeCheck} tone="bg-[#eaf8f2] text-[#14835b]" /><SummaryCard label="Com OS" value={String(quotes.filter((quote) => quote.osId).length)} helper="encaminhados" icon={ClipboardCheck} tone="bg-[#f2edff] text-[#7852d6]" /></div><div className="mb-4 overflow-x-auto rounded-2xl border border-[#dbe7f1] bg-[#f7fbff] p-4"><WorkflowSteps quote={selected || quotes[0] || normalizeQuote({}, 0)} /></div><div className="space-y-3">{quotes.map((quote) => { const financialVisible = canWorkflow(role, "viewFinancial"); const isExpanded = expanded === quote.id; return <div key={quote.id} className={`${shell} overflow-hidden`}><button onClick={() => { setExpanded(isExpanded ? null : quote.id); window.localStorage.setItem("toldo:workflow-selected-quote", quote.id); }} className="flex w-full flex-col gap-3 p-4 text-left sm:flex-row sm:items-center sm:p-5"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#eaf2ff] text-[#2859a6]"><FileText size={20} /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-[13px] font-extrabold text-[#344861]">{quote.id} · {quote.customerName}</p><StatusBadge tone={quoteTone(quote.status)}>{quote.status}</StatusBadge></div><p className="mt-1 text-[11px] text-[#8192a4]">{quote.productModel} · {quote.measurements}</p></div><div className="flex items-center gap-3"><div className="text-right">{financialVisible ? <p className="text-[13px] font-extrabold text-[#17324d]">{quote.finalValue}</p> : <p className="text-[10px] font-bold text-[#9aa8b7]">Valor restrito</p>}<p className="mt-1 text-[10px] text-[#9aa8b7]">Validade: {quote.validUntil}</p></div>{isExpanded ? <ChevronDown size={17} className="text-[#9aa8b7]" /> : <ChevronRight size={17} className="text-[#c4cfdb]" />}</div></button>{isExpanded && <div className="border-t border-[#eef1f5] p-4 sm:p-5"><div className="grid gap-4 xl:grid-cols-[1fr_1fr_.75fr]"><div className="rounded-2xl bg-[#f8fafc] p-4"><p className="mb-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#8192a4]">Dados herdáveis</p><div className="grid gap-2 text-[11px] text-[#718398]"><p><b className="text-[#52647d]">Contato:</b> {quote.phone} · {quote.email}</p><p><b className="text-[#52647d]">Endereço:</b> {quote.address}, {quote.city}</p><p><b className="text-[#52647d]">Materiais:</b> {quote.materials}</p><p><b className="text-[#52647d]">Cor/acabamento:</b> {quote.color} · {quote.finish}</p><p><b className="text-[#52647d]">Quantidade:</b> {quote.quantity} · <b className="text-[#52647d]">Observações:</b> {quote.notes || "Sem observações"}</p></div></div>{financialVisible ? <div className="rounded-2xl bg-[#fffaf5] p-4"><p className="mb-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#d9620d]">Visão financeira</p><div className="grid gap-2 text-[11px] text-[#8d6c56]"><p>Custo: <b className="text-[#6b432a]">{quote.cost}</b></p><p>Margem: <b className="text-[#14835b]">{quote.margin}%</b></p><p>Valor final: <b className="text-[#6b432a]">{quote.finalValue}</b></p></div><p className="mt-4 flex items-center gap-1 text-[10px] font-bold text-[#9b6a4f]"><LockKeyhole size={12} /> Visível conforme permissão</p></div> : <div className="rounded-2xl bg-[#f4f6f8] p-4 text-[11px] font-bold text-[#8d9aaa]">Dados financeiros ocultos para este perfil.</div>}<div className="rounded-2xl bg-[#f8fafc] p-4"><p className="mb-3 text-[10px] font-extrabold uppercase tracking-[0.14em] text-[#8192a4]">Histórico</p><HistoryList history={quote.history} /></div></div><div className="mt-4 flex flex-wrap gap-2"><button onClick={() => { if (quote.status === "Aprovado" || quote.status === "Cancelado") return toast.info("Este orçamento não pode mais ser editado."); setForm("edit"); }} className="flex items-center gap-1.5 rounded-xl bg-[#f3f7fd] px-3 py-2 text-[10px] font-extrabold text-[#2859a6]"><Pencil size={13} /> Editar orçamento</button>{quote.status !== "Aprovado" && quote.status !== "Cancelado" && <button onClick={() => approve(quote)} className="flex items-center gap-1.5 rounded-xl bg-[#eaf8f2] px-3 py-2 text-[10px] font-extrabold text-[#14835b]"><BadgeCheck size={13} /> Aprovar orçamento</button>}{quote.status === "Aprovado" && !quote.clientId && <button onClick={() => convert(quote)} className="flex items-center gap-1.5 rounded-xl bg-[#fff1e7] px-3 py-2 text-[10px] font-extrabold text-[#d9620d]"><UserCheck size={13} /> Converter em cliente</button>}{quote.status === "Aprovado" && quote.clientId && !quote.osId && <button onClick={() => issueOS(quote)} className="flex items-center gap-1.5 rounded-xl bg-[#eaf2ff] px-3 py-2 text-[10px] font-extrabold text-[#2859a6]"><ClipboardList size={13} /> Emitir OS</button>}{quote.osId && !orders.find((order) => order.id === quote.osId)?.productionId && <button onClick={() => sendProduction(quote)} className="flex items-center gap-1.5 rounded-xl bg-[#f2edff] px-3 py-2 text-[10px] font-extrabold text-[#7852d6]"><PackageCheck size={13} /> Enviar para produção</button>}{!quote.clientId && !quote.osId && <button onClick={() => cancel(quote)} className="flex items-center gap-1.5 rounded-xl bg-[#fff0ec] px-3 py-2 text-[10px] font-extrabold text-[#c35c42]"><Trash2 size={13} /> Cancelar orçamento</button>}</div></div>}</div>; })}</div>{form && <QuoteFormDialog initial={form === "edit" ? selected : undefined} onClose={() => setForm(null)} onSave={saveQuote} />}{modal}</div>;
 }
@@ -277,31 +280,35 @@ function WorkflowClientsView({ onModuleChange }: WorkflowViewProps) {
   const quote = client && quotes.find((item) => item.id === client.quoteId || item.id === client.sourceQuoteId);
   const order = client && orders.find((item) => item.id === client.osId || item.clientId === client.id);
   const openQuote = () => { if (!quote) return toast.info("Este cadastro não possui orçamento vinculado."); window.localStorage.setItem("toldo:workflow-selected-quote", quote.id); onModuleChange("orcamentos"); };
-  const saveClient = (draft: Partial<WorkflowClient>) => {
+  const saveClient = async (draft: Partial<WorkflowClient>) => {
     const name = String(draft.name || "").trim();
     const phone = String(draft.phone || "").trim();
     if (!name || !phone) return toast.error("Informe o nome e o telefone do cliente.");
     const digits = String(draft.taxId || "").replace(/\D/g, "");
     if (digits && digits.length !== 11 && digits.length !== 14) return toast.error("CPF deve ter 11 dígitos ou CNPJ 14 dígitos.");
     if (editing) {
-      setClients((current) => current.map((item) => item.id === editing.id ? { ...item, ...draft, name, phone, history: [...item.history, makeHistory("Cadastro do cliente editado", "Tela de Clientes")] } : item));
+      const saved = await setClients((current) => current.map((item) => item.id === editing.id ? { ...item, ...draft, name, phone, history: [...item.history, makeHistory("Cadastro do cliente editado", "Tela de Clientes")] } : item));
+      if (!saved) return;
       toast.success("Cliente atualizado.");
     } else {
       const newClient: WorkflowClient = { id: nextId("CLI", clients), name, phone, email: String(draft.email || ""), taxId: digits, address: String(draft.address || ""), city: String(draft.city || ""), notes: String(draft.notes || ""), source: "cadastro manual", sourceQuoteId: "", product: "A definir", quoteId: "", history: [makeHistory("Cliente cadastrado", "Tela de Clientes")] };
-      setClients((current) => [newClient, ...current]);
+      const saved = await setClients((current) => [newClient, ...current]);
+      if (!saved) return;
       setSelectedId(newClient.id);
       toast.success("Cliente cadastrado.");
     }
     setFormOpen(false);
     setEditing(undefined);
   };
-  const removeClient = (item: WorkflowClient) => {
+  
+  const removeClient = async (item: WorkflowClient) => {
     const linkedQuote = quotes.some((entry) => entry.clientId === item.id || entry.customerName.toLocaleLowerCase() === item.name.toLocaleLowerCase() && (entry.clientId || entry.osId));
     const linkedOrder = orders.some((entry) => entry.clientId === item.id);
     if (linkedQuote || linkedOrder || item.osId) return toast.error("Este cliente possui orçamento ou OS vinculada. Não pode ser removido para preservar o histórico.");
     if (!canWorkflow(role, "deleteRecord")) return toast.error("Seu perfil não pode remover clientes.");
     if (!window.confirm(`Deseja remover o cadastro de ${item.name}?`)) return;
-    setClients((current) => current.filter((entry) => entry.id !== item.id));
+    const saved = await setClients((current) => current.filter((entry) => entry.id !== item.id));
+    if (!saved) return;
     setSelectedId(null);
     toast.success("Cliente removido.");
   };
