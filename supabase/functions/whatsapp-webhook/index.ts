@@ -71,7 +71,7 @@ Deno.serve(async (request) => {
 
   for (const entry of payload.entry ?? []) {
     for (const change of Array.isArray(entry?.changes) ? entry.changes : []) {
-      if (change.field !== "messages") continue;
+      if (!change || typeof change !== "object" || change.field !== "messages") continue;
       const value = change.value ?? {};
       const phoneNumberId = value.metadata?.phone_number_id;
       if (typeof phoneNumberId !== "string" || !phoneNumberId) continue;
