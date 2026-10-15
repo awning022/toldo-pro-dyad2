@@ -17,6 +17,24 @@ const examples = [
   { title: "Registrar cliente", prompt: "Quero cadastrar um novo cliente. Me pergunte os dados que estiverem faltando." },
 ];
 
+async function getFunctionErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === "object") {
+    const candidate = error as { message?: string; context?: Response };
+    if (candidate.context && typeof candidate.context.clone === "function") {
+      try {
+        const response = candidate.context.clone();
+        const body = await response.json() as { error?: string; details?: string; message?: string };
+        if (body.details && (body.error || body.message)) return `${body.error || body.message}: ${body.details}`;
+        if (body.error || body.message) return body.error || body.message || fallback;
+      } catch {
+        // Algumas respostas de erro não vêm em JSON; usa a mensagem original abaixo.
+      }
+    }
+    if (candidate.message) return candidate.message;
+  }
+  return fallback;
+}
+
 function formatTime(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -105,7 +123,7 @@ export function AssistantAgentView() {
       if (data?.conversationId) await loadMessages(data.conversationId);
       await loadConversations();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Falha ao conversar com a IA.");
+      toast.error(await getFunctionErrorMessage(error, "Falha ao conversar com a IA."));
       setDraft(text);
     } finally {
       setLoading(false);
@@ -125,7 +143,7 @@ export function AssistantAgentView() {
       await loadMessages(activeConversation);
       await loadConversations();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível executar a ação.");
+      toast.error(await getFunctionErrorMessage(error, "Não foi possível executar a ação."));
     } finally {
       setLoading(false);
     }
