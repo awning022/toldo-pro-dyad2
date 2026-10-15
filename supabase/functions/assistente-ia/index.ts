@@ -280,7 +280,21 @@ Deno.serve(async (req) => {
     if (canSeeFinance && (privateQuotes.error || financeRows.error)) return json({ error: "Não foi possível carregar os valores financeiros autorizados." }, 500);
     const privateByKey = new Map<string, Record<string, unknown>>();
     for (const row of [...(privateQuotes.data || []), ...(financeRows.data || [])] as Row[]) privateByKey.set(row.entity + ":" + row.record_id, row.data);
-    const contextRecords = records.map((row) => {
+    const visibleRecords = records.filter((row) => {
+      const entity = row.entity;
+      if (entity === "quotes") return can(membership, "manageQuotes") || can(membership, "approveQuote") || can(membership, "issueOS");
+      if (entity === "customers") return can(membership, "manageCustomers") || can(membership, "convertClient");
+      if (entity === "leads") return can(membership, "manageCustomers");
+      if (entity === "work_orders") return can(membership, "issueOS") || can(membership, "manageProduction");
+      if (entity === "production") return can(membership, "manageProduction") || can(membership, "changeProductionStatus");
+      if (entity === "installations") return can(membership, "manageInstallations");
+      if (entity === "materials" || entity === "stock_movements") return can(membership, "manageStock") || can(membership, "requestMaterials") || can(membership, "manageProduction") || can(membership, "manageInstallations");
+      if (entity === "calculator_models" || entity === "calculator_projects") return can(membership, "editRules") || can(membership, "manageQuotes") || can(membership, "manageProduction");
+      if (entity === "notifications") return can(membership, "readNotifications");
+      if (entity === "agenda") return can(membership, "manageAgenda");
+      return false;
+    });
+    const contextRecords = visibleRecords.map((row) => {
       const data = { ...(row.data || {}) };
       if (row.entity === "quotes" && canSeeFinance) Object.assign(data, privateByKey.get("quotes:" + row.record_id) || {});
       if (!canSeeFinance && row.entity === "quotes") for (const key of ["cost", "margin", "finalValue"]) delete data[key];
