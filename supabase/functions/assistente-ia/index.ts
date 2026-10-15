@@ -319,6 +319,31 @@ Deno.serve(async (req) => {
     if (action.type === "create_customer" && !can(membership, "manageCustomers")) action = { type: "none", data: {} };
     if (action.type === "create_lead" && !can(membership, "manageCustomers")) action = { type: "none", data: {} };
     if (action.type === "create_finance" && !can(membership, "manageFinance")) action = { type: "none", data: {} };
+    if (action.type === "create_quote") {
+      const selectedModel = models.find((row) => row.id === String(action.data.modelId));
+      if (!selectedModel) {
+        reply = "Não encontrei o modelo indicado na calculadora desta empresa. Confira o nome do modelo e tente novamente.";
+        action = { type: "none", data: {} };
+      } else {
+        try {
+          const width = asNumber(action.data.width);
+          const depth = asNumber(action.data.depth);
+          const quantity = Math.max(1, Math.min(100, Math.floor(asNumber(action.data.quantity, 1))));
+          const margin = Math.min(500, asNumber(action.data.marginPercent, 30));
+          const calculation = calculateConfiguredModel(
+            selectedModel, width, depth, quantity,
+            asNumber(action.data.laborCost), asNumber(action.data.extraCost), margin, asNumber(action.data.taxPercent),
+          );
+          const breakdown = calculation.details.map((item) => "- " + item.name + ": " + item.note + "; " + item.stockUnits + " item(ns) comercial(is) · " + money(item.cost)).join("\n");
+          reply += "\n\n**Prévia calculada com a ficha técnica da empresa**\n- Materiais para compra: " + money(calculation.purchaseCost) + "\n- Custo total estimado: " + money(calculation.totalCost) + "\n- Preço sugerido: " + money(calculation.suggestedPrice) + "\n- Lucro estimado: " + money(calculation.estimatedProfit) + "\n\n**Materiais**\n" + breakdown;
+          if (calculation.warnings.length) reply += "\n\n**Atenção:** " + calculation.warnings.join(" ");
+          action = { type: action.type, data: { ...action.data, modelName: selectedModel.name, preview: { purchaseCost: calculation.purchaseCost, totalCost: calculation.totalCost, suggestedPrice: calculation.suggestedPrice, estimatedProfit: calculation.estimatedProfit, warnings: calculation.warnings, materials: calculation.details } } };
+        } catch (error) {
+          reply = error instanceof Error ? error.message : "Não consegui calcular esse orçamento com os dados cadastrados.";
+          action = { type: "none", data: {} };
+        }
+      }
+    }
     if (action.type !== "none") {
       const details = action.type === "create_quote"
         ? { ...action.data, modelName: models.find((row) => row.id === String(action.data.modelId))?.name || "Modelo a validar" }
