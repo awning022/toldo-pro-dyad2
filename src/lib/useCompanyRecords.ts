@@ -109,9 +109,19 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
     setReady(true);
   }, [canViewFinancial, companyId, enabled, entity]);
 
-  useEffect(() => {
-    void load();
+  const reload = useCallback(async () => {
+    setReady(false);
+    let observedQueue: Promise<void>;
+    do {
+      observedQueue = saveQueueRef.current;
+      await observedQueue.catch(() => undefined);
+    } while (observedQueue !== saveQueueRef.current);
+    await load();
   }, [load]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   const save = useCallback(async (next: T[], previous: T[]): Promise<boolean> => {
     if (!supabase) {
@@ -242,16 +252,6 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
       await load();
     });
   }, [ready, save, load]);
-
-  const reload = useCallback(async () => {
-    setReady(false);
-    let observedQueue: Promise<void>;
-    do {
-      observedQueue = saveQueueRef.current;
-      await observedQueue.catch(() => undefined);
-    } while (observedQueue !== saveQueueRef.current);
-    await load();
-  }, [load]);
 
   return { records, setRecords, ready, reload };
 }
