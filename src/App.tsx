@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthGate } from "@/components/AuthGate";
 import { AuthCallbackPage, ChangeEmailPage, ForgotPasswordPage, ResetPasswordPage } from "@/components/AuthFlows";
 import Index from "./pages/Index";
+import OwnerDashboard from "./pages/OwnerDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="*" element={<AuthGate>
             {(access) => <Routes>
               <Route path="/" element={<Index access={access} />} />
+              <Route path="/proprietario" element={<OwnerDashboard />} />
               <Route path="/ia" element={<Navigate to="/" replace />} />
               <Route path="*" element={<NotFound />} />
             </Routes>}
