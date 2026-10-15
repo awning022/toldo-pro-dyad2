@@ -323,6 +323,25 @@ export function CalculatorView() {
     }
   }, [modelsReady, canEditModels, models.length, setModels]);
 
+  useEffect(() => {
+    if (!modelsReady || !canEditModels || models.length === 0) return;
+    const fixedTemplate = defaultModels.find((model) => model.id === "preset-fixo-policarbonato");
+    const defaultCrossbars = fixedTemplate?.materials.find((material) => material.id === "fix-travessas");
+    if (!defaultCrossbars) return;
+    let changed = false;
+    const upgraded = models.map((model) => {
+      if (model.id !== "preset-fixo-policarbonato") return model;
+      const materials = model.materials.some((material) => material.id === "fix-travessas")
+        ? model.materials
+        : [...model.materials, { ...defaultCrossbars }];
+      const crossbarSpacing = number(model.crossbarSpacing) > 0 ? model.crossbarSpacing : 0.7;
+      if (materials === model.materials && crossbarSpacing === model.crossbarSpacing) return model;
+      changed = true;
+      return { ...model, crossbarSpacing, materials, updatedAt: new Date().toISOString() };
+    });
+    if (changed) setModels(upgraded);
+  }, [modelsReady, canEditModels, models, setModels]);
+
   const availableModels = models.length ? models : (canEditModels ? defaultModels : []);
   const selectedModel = availableModels.find((model) => model.id === selectedModelId) || availableModels[0] || null;
   const parsedWidth = number(width);
