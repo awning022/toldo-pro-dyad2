@@ -130,7 +130,7 @@ export function WorkflowProductionView({ onModuleChange }: WorkflowViewProps) {
     });
     if (error) return toast.error("Não foi possível enviar a produção para instalação.", { description: error.message });
     await Promise.all([reloadProductions(), reloadInstallations()]);
-    toast.success(`Instalação ${data.id} criada e produção encerrada`);
+    toast.success(`Instalação ${data?.installation_id || installationId} criada e produção encerrada`);
     onModuleChange("instalacoes");
   };
   const markReady = (item: WorkflowProduction) => {
