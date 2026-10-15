@@ -61,7 +61,7 @@ import { toast } from "sonner";
 
 type WorkflowViewProps = { onModuleChange: (module: ModuleKey) => void };
 type QuoteDraft = Partial<WorkflowQuote>;
-type Confirmation = { title: string; description: string; detail: string; confirmLabel: string; onConfirm: () => void; danger?: boolean };
+type Confirmation = { title: string; description: string; detail: string; confirmLabel: string; onConfirm: () => void | Promise<void>; danger?: boolean };
 
 const shell = "rounded-[22px] border border-[#e5ebf2] bg-white shadow-[0_9px_26px_rgba(24,43,73,0.045)]";
 const quoteKey = "toldo:quotes";
@@ -81,12 +81,10 @@ function useWorkflowList<T extends { id: string }>(key: string, fallback: T[], n
   if (!entity) throw new Error(`Unknown company record collection: ${key}`);
   const { records, setRecords, reload } = useCompanyRecords<T>(entity);
   const items = useMemo(() => records.map(normalize), [normalize, records]);
-  const update = (next: T[] | ((current: T[]) => T[])) => {
-    setRecords((current) => {
-      const normalized = current.map(normalize);
-      return typeof next === "function" ? next(normalized) : next;
-    });
-  };
+  const update = (next: T[] | ((current: T[]) => T[])) => setRecords((current) => {
+    const normalized = current.map(normalize);
+    return typeof next === "function" ? next(normalized) : next;
+  });
   return [items, update, reload] as const;
 }
 
@@ -111,7 +109,7 @@ function SummaryCard({ label, value, helper, icon: Icon, tone }: { label: string
 }
 
 function ConfirmDialog({ confirmation, onClose }: { confirmation: Confirmation; onClose: () => void }) {
-  return <div className="fixed inset-0 z-[70] flex items-end justify-center bg-[#102438]/40 p-3 backdrop-blur-sm sm:items-center"><div className="w-full max-w-[500px] rounded-[26px] bg-white p-5 shadow-[0_24px_70px_rgba(16,36,56,0.28)]"><div className="flex items-start justify-between gap-4"><div><p className="mb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#f47b20]">Confirmação obrigatória</p><h2 className="font-display text-[21px] font-extrabold tracking-[-0.04em] text-[#17324d]">{confirmation.title}</h2></div><button onClick={onClose} className="rounded-xl p-2 text-[#93a6b7]" aria-label="Fechar confirmação"><X size={18} /></button></div><div className="mt-5 rounded-2xl border border-[#e9eef4] bg-[#f8fafc] p-4"><p className="text-[12px] font-extrabold text-[#344861]">{confirmation.description}</p><p className="mt-2 whitespace-pre-line text-[11px] leading-5 text-[#718398]">{confirmation.detail}</p></div><div className="mt-5 flex gap-2"><Button variant="ghost" onClick={onClose} className="h-11 flex-1 rounded-xl text-[11px] font-bold">Cancelar</Button><Button onClick={() => { confirmation.onConfirm(); onClose(); }} className={`h-11 flex-1 rounded-xl text-[11px] font-bold text-white ${confirmation.danger ? "bg-[#c35c42] hover:bg-[#a94a36]" : "bg-[#f47b20] hover:bg-[#db6812]"}`}>{confirmation.confirmLabel} <Check size={15} /></Button></div></div></div>;
+  return <div className="fixed inset-0 z-[70] flex items-end justify-center bg-[#102438]/40 p-3 backdrop-blur-sm sm:items-center"><div className="w-full max-w-[500px] rounded-[26px] bg-white p-5 shadow-[0_24px_70px_rgba(16,36,56,0.28)]"><div className="flex items-start justify-between gap-4"><div><p className="mb-1 text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#f47b20]">Confirmação obrigatória</p><h2 className="font-display text-[21px] font-extrabold tracking-[-0.04em] text-[#17324d]">{confirmation.title}</h2></div><button onClick={onClose} className="rounded-xl p-2 text-[#93a6b7]" aria-label="Fechar confirmação"><X size={18} /></button></div><div className="mt-5 rounded-2xl border border-[#e9eef4] bg-[#f8fafc] p-4"><p className="text-[12px] font-extrabold text-[#344861]">{confirmation.description}</p><p className="mt-2 whitespace-pre-line text-[11px] leading-5 text-[#718398]">{confirmation.detail}</p></div><div className="mt-5 flex gap-2"><Button variant="ghost" onClick={onClose} className="h-11 flex-1 rounded-xl text-[11px] font-bold">Cancelar</Button><Button onClick={async () => { await confirmation.onConfirm(); onClose(); }} className={`h-11 flex-1 rounded-xl text-[11px] font-bold text-white ${confirmation.danger ? "bg-[#c35c42] hover:bg-[#a94a36]" : "bg-[#f47b20] hover:bg-[#db6812]"}`}>{confirmation.confirmLabel} <Check size={15} /></Button></div></div></div>;
 }
 
 function HistoryList({ history }: { history: WorkflowHistory[] }) {
