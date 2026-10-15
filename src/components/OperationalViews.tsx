@@ -32,7 +32,9 @@ import type { ModuleKey } from "@/components/ModuleViews";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FinanceView } from "@/components/FinanceView";
-import type { AppNotification } from "@/lib/operationsStore";
+import type { AppNotification, StockMaterial } from "@/lib/operationsStore";
+import type { FinanceEntry } from "@/components/FinanceView";
+import type { WorkflowClient, WorkflowInstallation, WorkflowOS, WorkflowProduction, WorkflowQuote } from "@/lib/workflowData";
 import { useCompanyRecords } from "@/lib/useCompanyRecords";
 import { useCompanyAccess } from "@/lib/CompanyAccessContext";
 import { supabase } from "@/lib/supabase";
@@ -98,8 +100,48 @@ function WorkOrdersModule() {
 }
 
 function ReportsModule() {
-  const reports = [{ title: "Desempenho comercial", helper: "Leads, vendas e conversão", value: "32,4%", icon: Sparkles, tone: "bg-[#eaf2ff] text-[#2859a6]" }, { title: "Produção e prazos", helper: "Ordens por status e prazo", value: "92%", icon: ClipboardList, tone: "bg-[#fff1e7] text-[#d9620d]" }, { title: "Instalações", helper: "Entregas dentro do prazo", value: "24", icon: Wrench, tone: "bg-[#eaf8f2] text-[#14835b]" }, { title: "Saúde do estoque", helper: "Giro e materiais críticos", value: "2 alertas", icon: ListChecks, tone: "bg-[#f2edff] text-[#7852d6]" }, { title: "Financeiro", helper: "Receitas, despesas e margem", value: "R$ 112 mil", icon: Wallet, tone: "bg-[#fff5db] text-[#a97810]" }, { title: "Clientes e equipe", helper: "Atividade e recorrência", value: "86 ativos", icon: FileText, tone: "bg-[#eaf2ff] text-[#2859a6]" }];
-  return <div><PageHeader eyebrow="Inteligência" title="Relatórios" description="Visões rápidas para decisões comerciais, operacionais e financeiras." /><div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4"><SummaryCard label="Relatórios prontos" value="12" helper="atualizados hoje" icon={FileBarChart} tone="bg-[#eaf2ff] text-[#2859a6]" /><SummaryCard label="Exportações" value="8" helper="neste mês" icon={Download} tone="bg-[#eaf8f2] text-[#14835b]" /><SummaryCard label="Indicadores" value="24" helper="acompanhados" icon={Sparkles} tone="bg-[#f2edff] text-[#7852d6]" /><SummaryCard label="Última atualização" value="Agora" helper="dados do Toldo Pro" icon={CircleCheck} tone="bg-[#fff1e7] text-[#d9620d]" /></div><div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">{reports.map((report) => { const Icon = report.icon; return <div key={report.title} className={`${shell} p-5`}><div className="flex items-start justify-between"><div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${report.tone}`}><Icon size={19} /></div><span className="rounded-full bg-[#f4f6f8] px-2 py-1 text-[9px] font-bold text-[#8190a0]">Atualizado</span></div><h2 className="mt-5 font-display text-[16px] font-extrabold text-[#17324d]">{report.title}</h2><p className="mt-1 text-[11px] text-[#8d9aaa]">{report.helper}</p><div className="mt-5 flex items-end justify-between"><strong className="font-display text-[24px] font-extrabold tracking-[-0.05em] text-[#17324d]">{report.value}</strong><div className="flex gap-1.5"><button onClick={() => toast.success(`Abrindo ${report.title}`)} className="rounded-xl bg-[#f3f7fd] p-2 text-[#2859a6]" aria-label="Abrir relatório"><ChevronRight size={15} /></button><button onClick={() => toast.success("Exportação preparada")} className="rounded-xl bg-[#17324d] p-2 text-white" aria-label="Exportar relatório"><Download size={15} /></button></div></div></div>; })}</div></div>;
+  const access = useCompanyAccess();
+  const { records: quotes } = useCompanyRecords<WorkflowQuote>("quotes");
+  const { records: leads } = useCompanyRecords<{ id: string; name?: string; value?: string; stage: string }>("leads");
+  const { records: workOrders } = useCompanyRecords<WorkflowOS>("work_orders");
+  const { records: production } = useCompanyRecords<WorkflowProduction>("production");
+  const { records: installations } = useCompanyRecords<WorkflowInstallation>("installations");
+  const { records: materials } = useCompanyRecords<StockMaterial>("materials");
+  const { records: clients } = useCompanyRecords<WorkflowClient>("customers");
+  const { records: finance } = useCompanyRecords<FinanceEntry>("finance");
+  const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const closedLeads = leads.filter((lead) => lead.stage === "Fechado").length;
+  const completedProduction = production.filter((item) => item.status === "Concluída").length;
+  const completedInstallations = installations.filter((item) => item.status === "Concluída").length;
+  const lowStock = materials.filter((item) => Number(item.quantity) < Number(item.minimum));
+  const openQuoteCount = quotes.filter((quote) => !["Aprovado", "Cancelado"].includes(quote.status)).length;
+  const financeTotal = finance.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+  const reports = [
+    { title: "Desempenho comercial", helper: "Leads fechados sobre os contatos cadastrados", value: leads.length ? `${Math.round(closedLeads / leads.length * 100)}%` : "—", detail: `${closedLeads} de ${leads.length} leads fechados`, icon: Sparkles, tone: "bg-[#eaf2ff] text-[#2859a6]" },
+    { title: "Orçamentos", helper: "Oportunidades ainda não aprovadas ou canceladas", value: String(openQuoteCount), detail: `${quotes.length} orçamento(s) cadastrados`, icon: FileText, tone: "bg-[#fff1e7] text-[#d9620d]" },
+    { title: "Produção", helper: "Ordens marcadas como concluídas", value: production.length ? `${completedProduction}/${production.length}` : "—", detail: `${workOrders.length} ordem(ns) de serviço`, icon: ClipboardList, tone: "bg-[#fff1e7] text-[#d9620d]" },
+    { title: "Instalações", helper: "Instalações registradas como concluídas", value: String(completedInstallations), detail: `${installations.length} instalação(ões) cadastradas`, icon: Wrench, tone: "bg-[#eaf8f2] text-[#14835b]" },
+    { title: "Saúde do estoque", helper: "Materiais abaixo do mínimo cadastrado", value: String(lowStock.length), detail: `${materials.length} material(is) cadastrados`, icon: ListChecks, tone: "bg-[#f2edff] text-[#7852d6]" },
+    { title: "Financeiro", helper: access.can("viewFinancial") ? "Soma dos lançamentos financeiros cadastrados" : "Seu perfil não possui acesso aos valores financeiros", value: access.can("viewFinancial") ? money(financeTotal) : "Restrito", detail: access.can("viewFinancial") ? `${finance.length} lançamento(s)` : "Acesso controlado por permissão", icon: Wallet, tone: "bg-[#fff5db] text-[#a97810]" },
+    { title: "Clientes", helper: "Cadastros vinculados à empresa", value: String(clients.length), detail: "Registros da empresa atual", icon: Users, tone: "bg-[#eaf2ff] text-[#2859a6]" },
+  ];
+  return <div>
+    <PageHeader eyebrow="Inteligência" title="Relatórios" description="Indicadores calculados a partir dos registros da empresa. Áreas sem dados aparecem vazias, sem números de demonstração." />
+    <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <SummaryCard label="Orçamentos" value={String(quotes.length)} helper="registros da empresa" icon={FileBarChart} tone="bg-[#eaf2ff] text-[#2859a6]" />
+      <SummaryCard label="Leads" value={String(leads.length)} helper="contatos cadastrados" icon={Users} tone="bg-[#eaf8f2] text-[#14835b]" />
+      <SummaryCard label="Ordens de serviço" value={String(workOrders.length)} helper="OS cadastradas" icon={ClipboardList} tone="bg-[#f2edff] text-[#7852d6]" />
+      <SummaryCard label="Última atualização" value="Ao abrir" helper="dados consultados do banco" icon={CircleCheck} tone="bg-[#fff1e7] text-[#d9620d]" />
+    </div>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {reports.map((report) => { const Icon = report.icon; return <div key={report.title} className={`${shell} p-5`}>
+        <div className="flex items-start justify-between"><div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${report.tone}`}><Icon size={19} /></div><span className="rounded-full bg-[#f4f6f8] px-2 py-1 text-[9px] font-bold text-[#8190a0]">Dados atuais</span></div>
+        <h2 className="mt-5 font-display text-[16px] font-extrabold text-[#17324d]">{report.title}</h2>
+        <p className="mt-1 text-[11px] text-[#8d9aaa]">{report.helper}</p>
+        <div className="mt-5 flex items-end justify-between gap-3"><strong className="break-words font-display text-[24px] font-extrabold tracking-[-0.05em] text-[#17324d]">{report.value}</strong><span className="text-right text-[10px] text-[#8d9aaa]">{report.detail}</span></div>
+      </div>; })}
+    </div>
+  </div>;
 }
 
 function SettingsModule() {
