@@ -18,7 +18,7 @@ export function MaterialUseDialog({ orderId, area, onClose, onUsed }: {
   orderId: string;
   area: "produção" | "instalação";
   onClose: () => void;
-  onUsed: (materialName: string, quantity: number, unit: string) => void;
+  onUsed: () => void | Promise<unknown>;
 }) {
   const { records: materials, reload: reloadMaterials } = useCompanyRecords<StockMaterial>("materials");
   const { reload: reloadMovements } = useCompanyRecords<StockMovement>("stock_movements");
@@ -41,7 +41,7 @@ export function MaterialUseDialog({ orderId, area, onClose, onUsed }: {
     });
     if (error) return toast.error("Não foi possível registrar o consumo.", { description: error.message });
     await Promise.all([reloadMaterials(), reloadMovements()]);
-    onUsed(usedMaterial.name, amount, usedMaterial.unit);
+    await onUsed();
     toast.success(`${amount} ${usedMaterial.unit} de ${usedMaterial.name} baixados do estoque`);
     onClose();
   };
