@@ -232,10 +232,10 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
     return true;
   }, [canEditFinance, canViewFinancial, companyId, enabled, entity]);
 
-  const setRecords = useCallback((update: T[] | ((current: T[]) => T[])) => {
+  const setRecords = useCallback((update: T[] | ((current: T[]) => T[])): Promise<boolean> => {
     if (!ready) {
       toast.info("Aguarde o carregamento dos registros antes de salvar.");
-      return;
+      return Promise.resolve(false);
     }
     const current = recordsRef.current;
     const next = typeof update === "function" ? update(current) : update;
@@ -243,14 +243,21 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
     setState(next);
     const operation = saveQueueRef.current.catch(() => undefined).then(async () => {
       const saved = await save(next, persistedRef.current);
-      if (saved) persistedRef.current = next;
-      else await load();
+      if (saved) {
+        persistedRef.current = next;
+        return true;
+      }
+      await load();
+      return false;
     });
-    saveQueueRef.current = operation.catch(async (error: unknown) => {
+    const settled = operation.catch(async (error: unknown) => {
       console.error("Falha inesperada ao salvar registros da empresa", error);
       toast.error("Ocorreu um erro inesperado ao salvar. Os dados serão recarregados do banco.");
       await load();
+      return false;
     });
+    saveQueueRef.current = settled.then(() => undefined);
+    return settled;
   }, [ready, save, load]);
 
   return { records, setRecords, ready, reload };
