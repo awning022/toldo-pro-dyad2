@@ -377,8 +377,8 @@ function Metric({ label, value, helper, icon: Icon }: { label: string; value: st
 export function CalculatorView() {
   const access = useCompanyAccess();
   const canEditModels = access.can("editRules");
-  const { records: models, setRecords: setModels, ready: modelsReady } = useCompanyRecords<CalculatorModel>("calculator_models", { enabled: canEditModels || access.can("manageQuotes") || access.can("manageProduction") });
-  const { records: projects, setRecords: setProjects, ready: projectsReady } = useCompanyRecords<CalculatorProject>("calculator_projects", { enabled: access.can("manageQuotes") || access.can("manageProduction") || canEditModels });
+  const { records: models, setRecords: setModels, ready: modelsReady } = useCompanyRecords<CalculatorModel>("calculator_models", { enabled: canEditModels || access.can("manageQuotes") });
+  const { records: projects, setRecords: setProjects, ready: projectsReady } = useCompanyRecords<CalculatorProject>("calculator_projects", { enabled: access.can("manageQuotes") || canEditModels });
   const [width, setWidth] = useState("5");
   const [depth, setDepth] = useState("3");
   const [projectName, setProjectName] = useState("Cobertura fixa");
