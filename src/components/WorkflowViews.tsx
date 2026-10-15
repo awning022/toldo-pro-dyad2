@@ -342,8 +342,8 @@ function printWorkOrder(order: WorkflowOS) {
 function WorkflowOSView({ onModuleChange }: WorkflowViewProps) {
   const role = getCurrentWorkflowRole();
   const [orders, setOrders, reloadOrders] = useWorkflowList<WorkflowOS>(osKey, defaultWorkflowOS, (value, index) => normalizeOS(value, index));
-  const [quotes, setQuotes] = useWorkflowList<WorkflowQuote>(quoteKey, defaultWorkflowQuotes, (value, index) => normalizeQuote(value, index));
-  const [clients, setClients] = useWorkflowList<WorkflowClient>(clientKey, defaultWorkflowClients, (value, index) => normalizeClient(value, index));
+  const [quotes, , reloadQuotes] = useWorkflowList<WorkflowQuote>(quoteKey, defaultWorkflowQuotes, (value, index) => normalizeQuote(value, index));
+  const [clients, , reloadClients] = useWorkflowList<WorkflowClient>(clientKey, defaultWorkflowClients, (value, index) => normalizeClient(value, index));
   const [productions, setProductions, reloadProductions] = useWorkflowList<WorkflowProduction>(productionKey, defaultWorkflowProduction, (value, index) => normalizeProduction(value, index));
   const [selectedId, setSelectedId] = useState<string | null>(() => window.localStorage.getItem("toldo:workflow-selected-os"));
   const [chooseQuote, setChooseQuote] = useState(false);
@@ -354,18 +354,31 @@ function WorkflowOSView({ onModuleChange }: WorkflowViewProps) {
   const completedOrders = orders.filter((order) => order.status === "Concluída");
   const issueFromQuote = (quote: WorkflowQuote) => {
     if (!canWorkflow(role, "issueOS")) return toast.error("Seu perfil não pode emitir OS.");
-    const client = clients.find((item) => item.id === quote.clientId || item.sourceQuoteId === quote.id || item.quoteId === quote.id || (item.name === quote.customerName && !item.sourceQuoteId && !item.quoteId));
-    if (!client) return toast.error("A OS exige um cliente convertido do orçamento.");
+    if (quote.status !== "Aprovado") return toast.error("A O.S. só pode ser emitida para um orçamento aprovado.");
+    const client = clients.find((item) => item.id === quote.clientId || item.sourceQuoteId === quote.id || item.quoteId === quote.id);
+    if (!client) return toast.error("A O.S. exige um cliente convertido e vinculado ao orçamento.");
+    if (quote.osId || orders.some((order) => order.quoteId === quote.id)) return toast.info("Este orçamento já possui uma O.S. vinculada.");
+    if (!supabase) return toast.error("O banco de dados não está configurado.");
     setChooseQuote(false);
-    setConfirmation({ title: "Confirmar emissão da OS", description: `${quote.id} · ${client.name}`, detail: `Serviço: ${quote.productModel}\nMedidas: ${quote.measurements}\nMateriais: ${quote.materials}\nPrazo: ${quote.validUntil}\nA produção ainda não terá acesso aos valores financeiros.`, confirmLabel: "Emitir OS", onConfirm: () => {
-      const order = { id: nextId("OS", orders), clientId: client.id, clientName: client.name, quoteId: quote.id, service: quote.productModel, measurements: quote.measurements, materials: quote.materials, quantity: quote.quantity, color: quote.color, finish: quote.finish, deadline: quote.validUntil, notes: quote.notes, responsible: "A definir", priority: "Normal" as const, status: "Emitida" as const, history: [makeHistory("OS emitida", "Tela de OS", undefined, "Emitida")] };
-      setOrders((current) => [order, ...current]);
-      setQuotes((current) => current.map((item) => item.id === quote.id ? { ...item, osId: order.id, history: [...item.history, makeHistory("OS emitida", "Tela de OS", item.status, "OS emitida")] } : item));
-      setClients((current) => current.map((item) => item.id === client.id ? { ...item, osId: order.id, history: [...item.history, makeHistory("OS vinculada", "Tela de OS", undefined, order.id)] } : item));
-      setSelectedId(order.id);
-      window.localStorage.setItem("toldo:workflow-selected-os", order.id);
-      toast.success(`${order.id} emitida com sucesso`);
-    } });
+    const workOrderId = nextId("OS", orders);
+    setConfirmation({
+      title: "Confirmar emissão da OS",
+      description: `${quote.id} · ${client.name}`,
+      detail: `Serviço: ${quote.productModel}\nMedidas: ${quote.measurements}\nMateriais: ${quote.materials}\nPrazo: ${quote.validUntil}\nA produção ainda não terá acesso aos valores financeiros.`,
+      confirmLabel: "Emitir OS",
+      onConfirm: async () => {
+        const { data, error } = await supabase.rpc("issue_work_order_from_quote", { p_quote_id: quote.id, p_work_order_id: workOrderId });
+        if (error) {
+          toast.error("Não foi possível emitir a O.S.", { description: error.message });
+          return;
+        }
+        const actualOrderId = String(data?.work_order_id || workOrderId);
+        await Promise.all([reloadOrders(), reloadQuotes(), reloadClients()]);
+        setSelectedId(actualOrderId);
+        window.localStorage.setItem("toldo:workflow-selected-os", actualOrderId);
+        toast.success(`${actualOrderId} emitida com sucesso`);
+      },
+    });
   };
   const sendProduction = (order: WorkflowOS) => {
     if (!canWorkflow(role, "sendProduction")) return toast.error("Seu perfil não pode enviar serviços para produção.");
