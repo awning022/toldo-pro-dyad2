@@ -364,158 +364,169 @@ export function CalculatorView() {
   const canEditModels = access.can("editRules");
   const { records: models, setRecords: setModels, ready: modelsReady } = useCompanyRecords<CalculatorModel>("calculator_models", { enabled: canEditModels || access.can("manageQuotes") || access.can("manageProduction") });
   const { records: projects, setRecords: setProjects, ready: projectsReady } = useCompanyRecords<CalculatorProject>("calculator_projects", { enabled: access.can("manageQuotes") || access.can("manageProduction") || canEditModels });
-  const [selectedModelId, setSelectedModelId] = useState("");
-  const [editingModel, setEditingModel] = useState<CalculatorModel | null>(null);
-  const [projectName, setProjectName] = useState("Novo projeto");
   const [width, setWidth] = useState("5");
   const [depth, setDepth] = useState("3");
-  const [heightDrop, setHeightDrop] = useState("0.3");
-  const [quantity, setQuantity] = useState("1");
+  const [projectName, setProjectName] = useState("Cobertura fixa");
+  const [marginPercent, setMarginPercent] = useState("30");
   const [laborCost, setLaborCost] = useState("0");
   const [extraCost, setExtraCost] = useState("0");
-  const [marginPercent, setMarginPercent] = useState("30");
-  const [taxPercent, setTaxPercent] = useState("0");
-  const [activeTab, setActiveTab] = useState<"project" | "models" | "history">("project");
+  const [activeTab, setActiveTab] = useState<"calculate" | "settings" | "history">("calculate");
   const [modelDraft, setModelDraft] = useState<CalculatorModel | null>(null);
 
+  const fixedTemplate = defaultModels.find((model) => model.id === "preset-fixo-policarbonato")!;
   useEffect(() => {
-    if (modelsReady && canEditModels && models.length === 0) {
-      const now = new Date().toISOString();
-      setModels(defaultModels.map((model) => ({ ...model, createdAt: now, updatedAt: now, materials: model.materials.map((material) => ({ ...material })) })));
-    }
-  }, [modelsReady, canEditModels, models.length, setModels]);
-
-  useEffect(() => {
-    if (!modelsReady || !canEditModels || models.length === 0) return;
-    const fixedTemplate = defaultModels.find((model) => model.id === "preset-fixo-policarbonato");
-    const defaultCrossbars = fixedTemplate?.materials.find((material) => material.id === "fix-travessas");
-    if (!defaultCrossbars) return;
-    let changed = false;
-    const upgraded = models.map((model) => {
-      if (model.id !== "preset-fixo-policarbonato") return model;
-      const materials = model.materials.some((material) => material.id === "fix-travessas")
-        ? model.materials
-        : [...model.materials, { ...defaultCrossbars }];
-      const crossbarSpacing = number(model.crossbarSpacing) > 0 ? model.crossbarSpacing : 0.7;
-      if (materials === model.materials && crossbarSpacing === model.crossbarSpacing) return model;
-      changed = true;
-      return { ...model, crossbarSpacing, materials, updatedAt: new Date().toISOString() };
-    });
-    if (changed) setModels(upgraded);
+    if (!modelsReady || !canEditModels || models.some((model) => model.id === fixedTemplate.id)) return;
+    const now = new Date().toISOString();
+    setModels([...models, { ...fixedTemplate, createdAt: now, updatedAt: now, materials: fixedTemplate.materials.map((material) => ({ ...material })) }]);
   }, [modelsReady, canEditModels, models, setModels]);
 
-  const availableModels = models.length ? models : (canEditModels ? defaultModels : []);
-  const selectedModel = availableModels.find((model) => model.id === selectedModelId) || availableModels[0] || null;
+  const selectedModel = models.find((model) => model.id === fixedTemplate.id) || fixedTemplate;
   const parsedWidth = number(width);
   const parsedDepth = number(depth);
-  const parsedHeightDrop = number(heightDrop);
-  const parsedAngle = Math.atan2(parsedHeightDrop, Math.max(0.01, parsedDepth)) * 180 / Math.PI;
-  const parsedQuantity = Math.max(1, Math.floor(number(quantity)));
-  const result = useMemo(() => selectedModel ? calculateProject(selectedModel, parsedWidth, parsedDepth, parsedQuantity, number(laborCost), number(extraCost), number(marginPercent), number(taxPercent)) : null, [selectedModel, parsedWidth, parsedDepth, parsedQuantity, laborCost, extraCost, marginPercent, taxPercent]);
-
-  const startNewModel = () => {
-    setModelDraft({
-      id: uid(), name: "Novo modelo", category: "Personalizado", description: "",
-      defaultWidth: 5, defaultDepth: 3, materials: [newMaterial()], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-    });
-  };
-  const saveModel = () => {
-    if (!modelDraft || !modelDraft.name.trim()) { toast.error("Informe o nome do modelo."); return; }
-    if (!modelDraft.materials.length) { toast.error("Adicione pelo menos um material ao modelo."); return; }
-    const now = new Date().toISOString();
-    const clean: CalculatorModel = { ...modelDraft, name: modelDraft.name.trim(), updatedAt: now, materials: modelDraft.materials.map((item) => ({ ...item, name: item.name.trim() })) };
-    const exists = models.some((model) => model.id === clean.id);
-    setModels(exists ? models.map((model) => model.id === clean.id ? clean : model) : [clean, ...models]);
-    setSelectedModelId(clean.id);
-    setModelDraft(null);
-    toast.success("Modelo salvo na empresa.");
-  };
-  const deleteModel = (model: CalculatorModel) => {
-    if (model.id.startsWith("preset-")) {
-      toast.info("Os modelos iniciais não podem ser removidos. Você pode editá-los ou criar uma cópia.");
-      return;
-    }
-    if (!window.confirm("Excluir o modelo " + model.name + "? Os projetos já salvos serão mantidos.")) return;
-    setModels(models.filter((item) => item.id !== model.id));
-    if (selectedModelId === model.id) setSelectedModelId("");
-    toast.success("Modelo removido.");
-  };
-  const saveProject = () => {
-    if (!selectedModel || !result) { toast.error("Escolha um modelo de toldo."); return; }
-    if (parsedWidth <= 0 || parsedDepth <= 0) { toast.error("Informe largura e avanço/altura maiores que zero."); return; }
-    const project: CalculatorProject = {
-      id: uid(), name: projectName.trim() || "Projeto sem nome", modelId: selectedModel.id, modelName: selectedModel.name,
-      width: parsedWidth, depth: parsedDepth, heightDrop: parsedHeightDrop, quantity: parsedQuantity, laborCost: number(laborCost), extraCost: number(extraCost),
-      marginPercent: number(marginPercent), taxPercent: number(taxPercent), result, createdAt: new Date().toISOString(),
-    };
-    setProjects([project, ...projects]);
-    setActiveTab("history");
-    toast.success("Projeto e relatório de sobras salvos.");
-  };
-
-  const updateMaterial = (materialId: string, patch: Partial<MaterialRule>) => {
-    if (!modelDraft) return;
-    setModelDraft({ ...modelDraft, materials: modelDraft.materials.map((item) => item.id === materialId ? { ...item, ...patch } : item) });
-  };
+  const parsedMargin = Math.min(99, number(marginPercent));
+  const result = useMemo(
+    () => calculateProject(selectedModel, parsedWidth, parsedDepth, 1, number(laborCost), number(extraCost), parsedMargin, 0),
+    [selectedModel, parsedWidth, parsedDepth, laborCost, extraCost, parsedMargin],
+  );
+  const priceConfigured = selectedModel.materials.length > 0 && selectedModel.materials.every((material) => number(material.stockPrice) > 0);
   const fieldClass = "h-10 rounded-xl border-slate-200 bg-white text-sm";
   const labelClass = "mb-1.5 block text-xs font-semibold text-slate-600";
 
-  if (!modelsReady || !projectsReady) return <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500">Carregando calculadora da empresa…</div>;
+  const updateDraftMaterial = (materialId: string, patch: Partial<MaterialRule>) => {
+    if (!modelDraft) return;
+    setModelDraft({ ...modelDraft, materials: modelDraft.materials.map((material) => material.id === materialId ? { ...material, ...patch } : material) });
+  };
+  const saveSettings = () => {
+    if (!modelDraft) return;
+    if (!modelDraft.materials.length) { toast.error("Cadastre pelo menos um material."); return; }
+    if (modelDraft.materials.some((material) => !material.name.trim())) { toast.error("Todos os materiais precisam ter um nome."); return; }
+    const clean = { ...modelDraft, name: "Cobertura fixa de alumínio e policarbonato", updatedAt: new Date().toISOString(), materials: modelDraft.materials.map((material) => ({ ...material, name: material.name.trim() })) };
+    setModels(models.some((model) => model.id === clean.id) ? models.map((model) => model.id === clean.id ? clean : model) : [...models, clean]);
+    setModelDraft(null);
+    toast.success("Configuração de materiais salva para esta empresa.");
+  };
+  const saveProject = () => {
+    if (parsedWidth <= 0 || parsedDepth <= 0) { toast.error("Informe a largura e o avanço em metros."); return; }
+    if (!priceConfigured) { toast.error("Preencha o preço comercial de todos os materiais na aba Configuração antes de salvar o orçamento."); setActiveTab("settings"); return; }
+    const project: CalculatorProject = {
+      id: uid(), name: projectName.trim() || "Cobertura fixa", modelId: selectedModel.id, modelName: selectedModel.name,
+      width: parsedWidth, depth: parsedDepth, heightDrop: 0, quantity: 1, laborCost: number(laborCost), extraCost: number(extraCost),
+      marginPercent: parsedMargin, taxPercent: 0, result, createdAt: new Date().toISOString(),
+    };
+    setProjects([project, ...projects]);
+    toast.success("Cálculo salvo no histórico.");
+    setActiveTab("history");
+  };
 
-  return <div className="space-y-6">
-    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-      <div><p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-orange-600">Projetos e precificação</p><h1 className="font-display text-3xl font-bold tracking-tight text-slate-900">Calculadora de toldos</h1><p className="mt-2 max-w-3xl text-sm text-slate-500">Configure os modelos e materiais da empresa. Cada projeto calcula consumo, compra, sobras com medidas e valor proporcional.</p></div>
-      <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setActiveTab("history")}><Layers3 size={16} className="mr-2" /> Projetos salvos ({projects.length})</Button>{canEditModels && <Button onClick={startNewModel} className="bg-orange-600 text-white hover:bg-orange-700"><Plus size={16} className="mr-2" /> Novo modelo</Button>}</div>
-    </div>
-    <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-      <button onClick={() => setActiveTab("project")} className={"rounded-xl px-4 py-2 text-sm font-semibold " + (activeTab === "project" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-100")}>Calcular projeto</button>
-      {canEditModels && <button onClick={() => setActiveTab("models")} className={"rounded-xl px-4 py-2 text-sm font-semibold " + (activeTab === "models" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-100")}>Modelos e materiais</button>}
-      <button onClick={() => setActiveTab("history")} className={"rounded-xl px-4 py-2 text-sm font-semibold " + (activeTab === "history" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-100")}>Histórico e sobras</button>
-    </div>
+  if (!modelsReady || !projectsReady) return <div className="rounded-2xl border border-slate-200 bg-white p-8 text-sm text-slate-500">Carregando calculadora…</div>;
 
-    {activeTab === "project" && <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
-      <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex items-center gap-2"><Ruler size={18} className="text-orange-600" /><h2 className="font-bold text-slate-900">Medidas do projeto</h2></div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-xs font-semibold text-slate-600">Modelo de toldo<select className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={selectedModel?.id || ""} onChange={(event) => { setSelectedModelId(event.target.value); const model = availableModels.find((item) => item.id === event.target.value); if (model) { setWidth(String(model.defaultWidth)); setDepth(String(model.defaultDepth)); } }}><option value="">Selecione um modelo</option>{availableModels.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label>
-          <label className="block text-xs font-semibold text-slate-600">Nome do projeto<Input className={fieldClass + " mt-1.5"} value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Ex.: Cobertura da garagem" /></label>
-          <label className="block text-xs font-semibold text-slate-600">Largura (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0.01" step="0.01" value={width} onChange={(event) => setWidth(event.target.value)} /></label>
-          <label className="block text-xs font-semibold text-slate-600">Avanço (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0.01" step="0.01" value={depth} onChange={(event) => setDepth(event.target.value)} /></label>
-          <label className="block text-xs font-semibold text-slate-600">Desnível entre parede e frente (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={heightDrop} onChange={(event) => setHeightDrop(event.target.value)} /><span className="mt-1 block text-[10px] font-normal text-slate-500">Ex.: 0,30 m = 30 cm de queda ao longo do avanço.</span></label>
-          <label className="block text-xs font-semibold text-slate-600">Quantidade de toldos<Input className={fieldClass + " mt-1.5"} type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
-          <label className="block text-xs font-semibold text-slate-600">Mão de obra (R$)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={laborCost} onChange={(event) => setLaborCost(event.target.value)} /></label>
-          <label className="block text-xs font-semibold text-slate-600">Outros custos (R$)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={extraCost} onChange={(event) => setExtraCost(event.target.value)} /></label>
-          <label className="block text-xs font-semibold text-slate-600">Margem desejada (%)<Input className={fieldClass + " mt-1.5"} type="number" min="0" max="99" step="0.5" value={marginPercent} onChange={(event) => setMarginPercent(event.target.value)} /></label>
-          <label className="block text-xs font-semibold text-slate-600">Impostos sobre venda (%)<Input className={fieldClass + " mt-1.5"} type="number" min="0" max="99" step="0.1" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} /></label>
+  const formatDimension = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 3 }) + " m";
+  const materialUnitLabel = (material: MaterialRule) => material.type === "linear" ? "barra/perfil comercial" : material.type === "sheet" ? "chapa/placa comercial" : "unidade";
+  const materialFormulaLabel = (formula: DimensionFormula) => formula === "width" ? "largura" : formula === "depth" ? "avanço" : "medida fixa";
+
+  return <div className="mx-auto max-w-7xl space-y-5">
+    <header className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+      <div>
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-orange-600">Cálculo rápido</p>
+        <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900">Cobertura fixa</h1>
+        <p className="mt-2 max-w-2xl text-sm text-slate-500">Informe largura e avanço. A calculadora estima alumínio, policarbonato, calha, compra de materiais, sobras e preço sugerido com base na configuração da sua empresa.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => setActiveTab("history")}><Layers3 size={16} className="mr-2" /> Histórico ({projects.length})</Button>
+        {canEditModels && <Button variant={activeTab === "settings" ? "default" : "outline"} onClick={() => { setModelDraft({ ...selectedModel, materials: selectedModel.materials.map((material) => ({ ...material })) }); setActiveTab("settings"); }}><Pencil size={16} className="mr-2" /> Configurar materiais</Button>}
+      </div>
+    </header>
+
+    <nav className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+      <button onClick={() => setActiveTab("calculate")} className={"rounded-xl px-4 py-2 text-sm font-semibold " + (activeTab === "calculate" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-100")}>Calcular</button>
+      {canEditModels && <button onClick={() => { if (!modelDraft) setModelDraft({ ...selectedModel, materials: selectedModel.materials.map((material) => ({ ...material })) }); setActiveTab("settings"); }} className={"rounded-xl px-4 py-2 text-sm font-semibold " + (activeTab === "settings" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-100")}>Configuração</button>}
+      <button onClick={() => setActiveTab("history")} className={"rounded-xl px-4 py-2 text-sm font-semibold " + (activeTab === "history" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-100")}>Histórico</button>
+    </nav>
+
+    {activeTab === "calculate" && <div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="flex items-center gap-3">
+          <div className="rounded-xl bg-orange-50 p-3 text-orange-700"><Ruler size={22} /></div>
+          <div><h2 className="text-lg font-bold text-slate-900">1. Medidas da cobertura</h2><p className="text-xs text-slate-500">Todas as medidas em metros</p></div>
         </div>
-        {!selectedModel && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Ainda não há modelos cadastrados. Peça ao administrador para carregar os modelos iniciais ou cadastrar um modelo.</div>}
-        {selectedModel && <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm font-semibold text-slate-800">{selectedModel.category}</p><p className="mt-1 text-xs leading-5 text-slate-500">{selectedModel.description || "Ficha técnica configurada pela empresa."}</p><p className="mt-2 text-xs text-slate-500">{selectedModel.materials.length} linha(s) de materiais cadastradas. Preços zerados precisam ser preenchidos pelo administrador.</p>{selectedModel.materials.some((material) => material.spacingBased) && <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-3"><p className="text-xs font-bold text-orange-900">Estimativa de travessas de apoio</p><p className="mt-1 text-sm text-orange-900">{Math.max(2, Math.ceil(parsedWidth / Math.max(0.1, number(selectedModel.crossbarSpacing ?? 0.7))) + 1)} travessas por toldo · corte de {meters(parsedDepth)} cada</p><p className="mt-1 text-xs text-orange-800">Vão máximo configurado: {meters(Math.max(0.1, number(selectedModel.crossbarSpacing ?? 0.7)))}. A quantidade total de travessas é multiplicada pelo número de toldos.</p></div>}</div>}
-        <div className="flex flex-wrap gap-2"><Button disabled={!result || !selectedModel} onClick={saveProject} className="bg-orange-600 text-white hover:bg-orange-700"><Save size={16} className="mr-2" /> Salvar projeto e sobras</Button><Button variant="outline" onClick={() => { setProjectName("Novo projeto"); setQuantity("1"); setLaborCost("0"); setExtraCost("0"); }}><Calculator size={16} className="mr-2" /> Limpar custos</Button></div>
+        <label className="block text-xs font-semibold text-slate-600">Nome do projeto (opcional)<Input className={fieldClass + " mt-1.5"} value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Ex.: Garagem da frente" /></label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-xs font-semibold text-slate-600">Largura (m)<Input className="mt-1.5 h-14 rounded-xl border-slate-200 text-xl font-bold" type="number" min="0.01" step="0.01" value={width} onChange={(event) => setWidth(event.target.value)} placeholder="Ex.: 5" /><span className="mt-1 block text-[11px] font-normal text-slate-500">Medida de um lado ao outro</span></label>
+          <label className="block text-xs font-semibold text-slate-600">Avanço (m)<Input className="mt-1.5 h-14 rounded-xl border-slate-200 text-xl font-bold" type="number" min="0.01" step="0.01" value={depth} onChange={(event) => setDepth(event.target.value)} placeholder="Ex.: 3" /><span className="mt-1 block text-[11px] font-normal text-slate-500">Da parede até a parte da frente</span></label>
+        </div>
+        <div className="rounded-xl border border-orange-100 bg-orange-50 p-4">
+          <p className="text-xs font-semibold text-orange-800">Área estimada</p>
+          <p className="mt-1 text-3xl font-extrabold text-orange-900">{(parsedWidth * parsedDepth).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} m²</p>
+          <p className="mt-1 text-xs text-orange-800">Cálculo para 1 cobertura fixa de alumínio com policarbonato.</p>
+        </div>
+        <details className="rounded-xl border border-slate-200 p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-700">Custos opcionais e margem</summary>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <label className={labelClass}>Mão de obra total (R$)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={laborCost} onChange={(event) => setLaborCost(event.target.value)} /></label>
+            <label className={labelClass}>Outros custos (R$)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={extraCost} onChange={(event) => setExtraCost(event.target.value)} /></label>
+            <label className={labelClass}>Margem desejada (%)<Input className={fieldClass + " mt-1.5"} type="number" min="0" max="99" step="1" value={marginPercent} onChange={(event) => setMarginPercent(event.target.value)} /></label>
+          </div>
+        </details>
+        {!priceConfigured && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="font-bold">Falta configurar os preços</p><p className="mt-1 text-xs leading-5">O cálculo de cortes aparece, mas o preço final só fica confiável depois de cadastrar o preço de compra de cada material.</p>{canEditModels && <Button className="mt-3 bg-orange-600 text-white hover:bg-orange-700" onClick={() => { setModelDraft({ ...selectedModel, materials: selectedModel.materials.map((material) => ({ ...material })) }); setActiveTab("settings"); }}>Configurar agora</Button>}</div>}
+        <Button disabled={parsedWidth <= 0 || parsedDepth <= 0} className="w-full bg-orange-600 py-6 text-base font-bold text-white hover:bg-orange-700" onClick={saveProject}><Save size={18} className="mr-2" /> Salvar cálculo no histórico</Button>
       </section>
+
       <section className="space-y-4">
-        {result && <>
-          <ThreeDPreview model={selectedModel} width={parsedWidth} depth={parsedDepth} heightDrop={parsedHeightDrop} quantity={parsedQuantity} />
-          <div className="rounded-2xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-900">Ângulo e cortes preliminares</h3><div className="mt-3 grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-orange-50 p-3"><p className="text-xs text-orange-700">Ângulo da cobertura</p><p className="mt-1 text-2xl font-extrabold text-orange-700">{parsedAngle.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}°</p><p className="mt-1 text-[10px] text-orange-800">Calculado por arctan(desnível ÷ avanço)</p></div><div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-slate-500">Altura de queda</p><p className="mt-1 text-xl font-bold text-slate-800">{meters(parsedHeightDrop)}</p><p className="mt-1 text-[10px] text-slate-500">Informe a diferença vertical real entre a parede e a frente.</p></div></div><h4 className="mt-4 text-sm font-bold text-slate-800">Lista preliminar de cortes</h4><div className="mt-2 space-y-2">{selectedModel.materials.map((rule) => { const count = rule.spacingBased ? Math.max(2, Math.ceil(parsedWidth / Math.max(0.1, number(selectedModel.crossbarSpacing ?? 0.7))) + 1) : Math.max(0, Math.floor(number(rule.count))); const a = resolveDimension(rule.formulaA, parsedWidth, parsedDepth, rule.fixedA); const b = resolveDimension(rule.formulaB, parsedWidth, parsedDepth, rule.fixedB); const cut = rule.type === "unit" ? `${count * parsedQuantity} unidade(s)` : rule.type === "sheet" ? `${meters(a)} × ${meters(b)}` : meters(a); return <div key={rule.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2"><div><p className="text-xs font-semibold text-slate-800">{rule.name}</p><p className="mt-0.5 text-[10px] text-slate-500">{rule.type === "linear" ? "Perfil/barra" : rule.type === "sheet" ? "Chapa/lona" : "Acessórios"} · quantidade: {count * parsedQuantity}</p></div><span className="text-xs font-bold text-slate-700">{cut}</span></div>; })}</div><p className="mt-3 text-[10px] leading-4 text-amber-700">Cortes derivados das fórmulas cadastradas na ficha técnica; confira emendas, folgas, espessuras e orientação das chapas antes de fabricar.</p></div>
-          <div className="grid gap-3 sm:grid-cols-2"><Metric label="Compra de materiais" value={money(result.purchaseCost)} helper="Material comercial que precisa comprar" icon={Package} /><Metric label="Valor das sobras" value={money(result.scrapValue)} helper="Custo proporcional do material restante" icon={Scissors} /><Metric label="Custo de material consumido" value={money(result.consumedCost)} helper="Compra menos sobras aproveitáveis" icon={CircleDollarSign} /><Metric label="Preço sugerido" value={money(result.suggestedPrice)} helper={"Margem " + number(marginPercent) + "% · impostos " + number(taxPercent) + "%"} icon={Calculator} /></div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5"><h2 className="font-bold text-slate-900">Materiais deste projeto</h2><p className="mt-1 text-xs text-slate-500">As quantidades dependem da ficha técnica e das medidas comerciais configuradas.</p><div className="mt-4 space-y-4">{result.materials.map((item, index) => <div key={item.name + index} className="rounded-xl border border-slate-100 p-3"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="text-sm font-semibold text-slate-800">{item.name}</p><p className="mt-1 text-xs text-slate-500">Necessário: {item.needed}</p><p className="text-xs text-slate-500">Compra calculada: {item.purchased}</p></div><div className="text-right"><p className="text-sm font-bold text-slate-800">{money(item.purchasedCost)}</p><p className="text-xs text-emerald-700">Sobra: {money(item.scrapValue)}</p></div></div>{item.scraps.length > 0 ? <div className="mt-3 rounded-lg bg-emerald-50 p-3"><p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-emerald-800"><Scissors size={14} /> Sobras medidas e valorizadas</p>{item.scraps.map((scrap, scrapIndex) => <div key={scrap.source + scrapIndex} className="flex flex-wrap justify-between gap-2 border-t border-emerald-100 py-2 text-xs"><span className="text-emerald-900">{scrap.source}: {scrap.measure}</span><span className="font-bold text-emerald-800">{money(scrap.value)}</span></div>)}</div> : <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">Sem sobra aproveitável calculada para este material.</div>}{item.notes.map((note) => <p key={note} className="mt-2 text-xs text-amber-700">{note}</p>)}</div>)}</div></div>
-          {result.warnings.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="flex items-center gap-2 text-sm font-semibold text-amber-900"><AlertTriangle size={16} /> Confira estas observações</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-800">{result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
-          <div className="rounded-2xl bg-slate-900 p-5 text-white"><p className="text-xs text-slate-300">Resumo do orçamento</p><div className="mt-3 space-y-2 text-sm"><div className="flex justify-between gap-3"><span>Material comprado</span><span>{money(result.purchaseCost)}</span></div><div className="flex justify-between gap-3"><span>Valor das sobras aproveitáveis</span><span>- {money(result.scrapValue)}</span></div><div className="flex justify-between gap-3"><span>Mão de obra e outros custos</span><span>{money(result.laborCost + result.extraCost)}</span></div><div className="border-t border-slate-700 pt-3"><div className="flex justify-between gap-3 font-bold"><span>Preço sugerido</span><span>{money(result.suggestedPrice)}</span></div><p className="mt-1 text-xs text-slate-400">Lucro estimado após custo e impostos: {money(result.estimatedProfit)}</p></div></div></div>
-        </>}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Metric label="Material para comprar" value={money(result.purchaseCost)} helper="Custo total dos itens comerciais" icon={Package} />
+          <Metric label="Sobras estimadas" value={money(result.scrapValue)} helper="Valor proporcional de retalhos aproveitáveis" icon={Scissors} />
+          <Metric label="Custo estimado usado" value={money(result.consumedCost + number(laborCost) + number(extraCost))} helper="Material consumido + custos opcionais" icon={CircleDollarSign} />
+          <Metric label="Preço sugerido" value={priceConfigured ? money(result.suggestedPrice) : "Configure os preços"} helper={priceConfigured ? "Margem configurada: " + parsedMargin + "%" : "Não é exibido como valor confiável"} icon={Calculator} />
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-bold text-slate-900">2. Lista de materiais</h2><p className="mt-1 text-xs text-slate-500">Estimativa gerada pelas regras cadastradas na configuração.</p></div><Package className="text-orange-600" size={21} /></div>
+          <div className="mt-4 space-y-3">
+            {result.materials.map((material, index) => <article key={material.name + index} className="rounded-xl border border-slate-200 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-sm font-bold text-slate-900">{material.name}</h3><p className="mt-1 text-xs text-slate-500">Necessário: {material.needed}</p><p className="text-xs text-slate-500">Comprar: {material.purchased}</p></div><div className="text-right"><p className="text-sm font-bold text-slate-900">{money(material.purchasedCost)}</p><p className="text-xs text-emerald-700">Sobra: {money(material.scrapValue)}</p></div></div>
+              {material.scraps.length > 0 && <div className="mt-3 rounded-lg bg-emerald-50 p-3"><p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-emerald-800"><Scissors size={14} /> Sobras aproveitáveis</p>{material.scraps.map((scrap, scrapIndex) => <div key={scrap.source + scrapIndex} className="flex flex-wrap justify-between gap-2 border-t border-emerald-100 py-2 text-xs"><span className="text-emerald-900">{scrap.source}: {scrap.measure}</span><span className="font-bold text-emerald-800">{money(scrap.value)}</span></div>)}</div>}
+              {material.notes.map((note) => <p key={note} className="mt-2 text-xs text-amber-700">{note}</p>)}
+            </article>)}
+          </div>
+          {result.warnings.length > 0 && <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="flex items-center gap-2 text-sm font-semibold text-amber-900"><AlertTriangle size={16} /> Atenção</p><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-800">{result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></div>}
+        </div>
+        <div className="rounded-2xl bg-slate-900 p-5 text-white"><p className="text-xs text-slate-300">Resumo</p><div className="mt-3 space-y-2 text-sm"><div className="flex justify-between gap-3"><span>Compra dos materiais</span><span>{money(result.purchaseCost)}</span></div><div className="flex justify-between gap-3"><span>Valor estimado das sobras</span><span>- {money(result.scrapValue)}</span></div><div className="flex justify-between gap-3"><span>Mão de obra e extras</span><span>{money(number(laborCost) + number(extraCost))}</span></div><div className="border-t border-slate-700 pt-3"><div className="flex justify-between gap-3 font-bold"><span>Preço sugerido</span><span>{priceConfigured ? money(result.suggestedPrice) : "Pendente de configuração"}</span></div><p className="mt-1 text-xs text-slate-400">Preço estimado com margem de {parsedMargin}%, sem impostos adicionados.</p></div></div></div>
       </section>
     </div>}
 
-    {activeTab === "models" && canEditModels && <section className="rounded-2xl border border-slate-200 bg-white p-5">
-      <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h2 className="text-lg font-bold text-slate-900">Modelos e fichas técnicas</h2><p className="mt-1 text-sm text-slate-500">Os modelos iniciais são exemplos editáveis. Preencha preços reais e revise as regras de corte antes de usar um orçamento comercial.</p></div><Button onClick={startNewModel} className="bg-orange-600 text-white hover:bg-orange-700"><Plus size={16} className="mr-2" /> Criar modelo</Button></div>
-      <div className="grid gap-3 md:grid-cols-2">{models.map((model) => <div key={model.id} className="rounded-xl border border-slate-200 p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold text-slate-900">{model.name}</p><p className="mt-1 text-xs text-slate-500">{model.category} · {model.materials.length} materiais</p><p className="mt-1 text-xs text-slate-500">Medida de referência: {meters(model.defaultWidth)} × {meters(model.defaultDepth)}</p></div><div className="flex gap-1"><Button size="sm" variant="outline" onClick={() => setModelDraft({ ...model, materials: model.materials.map((item) => ({ ...item })) })}><Pencil size={14} /></Button><Button size="sm" variant="outline" onClick={() => { const copy = { ...model, id: uid(), name: model.name + " (cópia)", materials: model.materials.map((item) => ({ ...item, id: uid() })), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; setModels([copy, ...models]); toast.success("Cópia do modelo criada."); }}><Copy size={14} /></Button><Button size="sm" variant="outline" onClick={() => deleteModel(model)}><Trash2 size={14} /></Button></div></div></div>)}</div>
+    {activeTab === "settings" && canEditModels && <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-orange-600">Configuração da empresa</p><h2 className="mt-1 text-xl font-bold text-slate-900">Materiais da cobertura fixa</h2><p className="mt-1 max-w-3xl text-sm text-slate-500">Cadastre o tamanho e o preço de compra do item comercial completo: barra de alumínio, chapa de policarbonato, calha e acessórios. Os valores ficam salvos somente na empresa.</p></div><Button variant="outline" onClick={() => { setModelDraft({ ...selectedModel, materials: selectedModel.materials.map((material) => ({ ...material })) }); toast.info("Configuração recarregada. Alterações não salvas foram descartadas."); }}>Descartar alterações</Button></div>
+      {modelDraft && <div className="grid gap-4 sm:grid-cols-3"><label className={labelClass}>Espaçamento entre travessas (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0.1" step="0.05" value={String(modelDraft.crossbarSpacing ?? 0.7)} onChange={(event) => setModelDraft({ ...modelDraft, crossbarSpacing: number(event.target.value) || 0.7 })} /><span className="mt-1 block text-[11px] font-normal text-slate-500">Usado para estimar quantas travessas vão na largura.</span></label></div>}
+      {!modelDraft && <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Clique em “Editar configuração” para alterar os materiais.</div>}
+      {modelDraft && <div className="space-y-4">{modelDraft.materials.map((material, index) => <article key={material.id} className="rounded-2xl border border-slate-200 p-4 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-orange-600">Material {index + 1}</p><h3 className="mt-1 text-base font-bold text-slate-900">{material.name}</h3><p className="mt-1 text-xs text-slate-500">Preço do item comercial completo: {money(number(material.stockPrice))}</p></div><Button variant="outline" size="sm" onClick={() => setModelDraft({ ...modelDraft, materials: modelDraft.materials.filter((item) => item.id !== material.id) })}><Trash2 size={14} className="mr-1" /> Remover</Button></div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className={labelClass}>Nome do material<Input className={fieldClass + " mt-1.5"} value={material.name} onChange={(event) => updateDraftMaterial(material.id, { name: event.target.value })} placeholder="Ex.: Calha frontal" /></label>
+          <label className={labelClass}>Tipo<select className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={material.type} onChange={(event) => updateDraftMaterial(material.id, { type: event.target.value as MaterialType })}><option value="linear">Perfil, barra ou calha</option><option value="sheet">Chapa de policarbonato</option><option value="unit">Acessório por unidade</option></select></label>
+          {material.type !== "unit" && <label className={labelClass}>Comprimento comercial (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={String(material.stockLength)} onChange={(event) => updateDraftMaterial(material.id, { stockLength: number(event.target.value) })} /></label>}
+          {material.type === "sheet" && <label className={labelClass}>Largura comercial (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={String(material.stockWidth)} onChange={(event) => updateDraftMaterial(material.id, { stockWidth: number(event.target.value) })} /></label>}
+          <label className={labelClass}>Preço de compra (R$)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={String(material.stockPrice)} onChange={(event) => updateDraftMaterial(material.id, { stockPrice: number(event.target.value) })} /><span className="mt-1 block text-[11px] font-normal text-slate-500">{material.type === "linear" ? "Preço de uma barra/perfil completo" : material.type === "sheet" ? "Preço de uma chapa completa" : "Preço de uma unidade"}</span></label>
+        </div>
+        <details className="mt-4 rounded-xl bg-slate-50 p-3">
+          <summary className="cursor-pointer text-xs font-bold text-slate-700">Regra de consumo (alterar somente se necessário)</summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <label className={labelClass}>Consumo calculado por<select className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={material.formulaA} onChange={(event) => updateDraftMaterial(material.id, { formulaA: event.target.value as DimensionFormula })}><option value="width">Largura</option><option value="depth">Avanço</option><option value="fixed">Medida fixa</option></select></label>
+            {material.type === "sheet" && <label className={labelClass}>Segunda medida da chapa<select className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={material.formulaB} onChange={(event) => updateDraftMaterial(material.id, { formulaB: event.target.value as DimensionFormula })}><option value="width">Largura</option><option value="depth">Avanço</option><option value="fixed">Medida fixa</option></select></label>}
+            {material.formulaA === "fixed" && <label className={labelClass}>Medida fixa (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={String(material.fixedA)} onChange={(event) => updateDraftMaterial(material.id, { fixedA: number(event.target.value) })} /></label>}
+            {material.type === "sheet" && material.formulaB === "fixed" && <label className={labelClass}>Segunda medida fixa (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={String(material.fixedB)} onChange={(event) => updateDraftMaterial(material.id, { fixedB: number(event.target.value) })} /></label>}
+            {material.type !== "unit" && !material.spacingBased && <label className={labelClass}>Quantidade de cortes por cobertura<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="1" value={String(material.count)} onChange={(event) => updateDraftMaterial(material.id, { count: Math.floor(number(event.target.value)) })} /></label>}
+            {material.type === "unit" && <label className={labelClass}>Quantidade de unidades por cobertura<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="1" value={String(material.count)} onChange={(event) => updateDraftMaterial(material.id, { count: Math.floor(number(event.target.value)) })} /></label>}
+            {material.type === "linear" && <label className={labelClass}>Perda do corte / serra (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.001" value={String(material.kerf)} onChange={(event) => updateDraftMaterial(material.id, { kerf: number(event.target.value) })} /></label>}
+            {material.spacingBased && <p className="self-center text-xs text-orange-800">A quantidade é calculada automaticamente pelo espaçamento entre travessas acima.</p>}
+          </div>
+        </details>
+      </article>)}</div>}
+      {modelDraft && <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setModelDraft({ ...selectedModel, materials: selectedModel.materials.map((material) => ({ ...material })) })}>Cancelar</Button><Button variant="outline" onClick={() => setModelDraft({ ...modelDraft, materials: [...modelDraft.materials, newMaterial("Novo perfil ou acessório")] })}><Plus size={16} className="mr-2" /> Adicionar material</Button><Button className="bg-orange-600 text-white hover:bg-orange-700" onClick={saveSettings}><Save size={16} className="mr-2" /> Salvar configuração</Button></div>}
+      <p className="text-xs leading-5 text-slate-500">Importante: a ficha técnica inicial é uma referência. Ajuste quantidades de perfis, calha, chapas e acessórios ao padrão real de fabricação da sua cobertura. A estimativa de sobras é matemática e precisa ser conferida antes do corte.</p>
     </section>}
 
-    {activeTab === "history" && <section className="rounded-2xl border border-slate-200 bg-white p-5"><h2 className="text-lg font-bold text-slate-900">Projetos salvos e histórico de sobras</h2><p className="mt-1 text-sm text-slate-500">Cada registro preserva as medidas, os custos e o relatório calculado naquele momento.</p>{projects.length === 0 ? <div className="mt-5 rounded-xl bg-slate-50 p-8 text-center text-sm text-slate-500">Nenhum projeto salvo ainda. Calcule um projeto e clique em “Salvar projeto e sobras”.</div> : <div className="mt-4 space-y-4">{projects.map((project) => <div key={project.id} className="rounded-xl border border-slate-200 p-4"><div className="flex flex-col justify-between gap-3 sm:flex-row"><div><p className="font-bold text-slate-900">{project.name}</p><p className="mt-1 text-xs text-slate-500">{project.modelName} · {meters(project.width)} × {meters(project.depth)} · {project.quantity} unidade(s)</p><p className="mt-1 text-xs text-slate-500">{new Date(project.createdAt).toLocaleString("pt-BR")}</p></div><div className="text-left sm:text-right"><p className="text-lg font-bold text-slate-900">{money(project.result.suggestedPrice)}</p><p className="text-xs text-emerald-700">Sobras: {money(project.result.scrapValue)}</p><Button size="sm" variant="outline" className="mt-2" onClick={() => { setProjectName(project.name); setSelectedModelId(project.modelId); setWidth(String(project.width)); setDepth(String(project.depth)); setHeightDrop(String(project.heightDrop ?? 0.3)); setQuantity(String(project.quantity)); setLaborCost(String(project.laborCost)); setExtraCost(String(project.extraCost)); setMarginPercent(String(project.marginPercent)); setTaxPercent(String(project.taxPercent)); setActiveTab("project"); }}>Reabrir medidas</Button></div></div><div className="mt-3 grid gap-2 sm:grid-cols-2">{project.result.materials.map((material, index) => <div key={material.name + index} className="rounded-lg bg-slate-50 p-3"><p className="text-xs font-semibold text-slate-800">{material.name}</p><p className="mt-1 text-xs text-slate-600">Sobra valorizada: {money(material.scrapValue)}</p>{material.scraps.length > 0 ? material.scraps.map((scrap, scrapIndex) => <p key={scrap.source + scrapIndex} className="mt-1 text-xs text-emerald-700">{scrap.source}: {scrap.measure} · {money(scrap.value)}</p>) : <p className="mt-1 text-xs text-slate-500">Sem sobra aproveitável registrada.</p>}</div>)}</div></div>)}</div>}</section>}
-
-    {modelDraft && canEditModels && <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-3 sm:p-6"><div className="mx-auto my-4 max-w-5xl rounded-2xl bg-white p-5 shadow-2xl sm:p-7"><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-wider text-orange-600">Configuração da ficha técnica</p><h2 className="mt-1 text-xl font-bold text-slate-900">{modelDraft.name}</h2><p className="mt-1 text-sm text-slate-500">Cadastre medidas comerciais, custo cheio de cada item e regra para calcular as peças do projeto.</p></div><Button variant="outline" onClick={() => setModelDraft(null)}>Fechar</Button></div>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="block text-xs font-semibold text-slate-600">Nome do modelo<Input className={fieldClass + " mt-1.5"} value={modelDraft.name} onChange={(event) => setModelDraft({ ...modelDraft, name: event.target.value })} /></label><label className="block text-xs font-semibold text-slate-600">Categoria<Input className={fieldClass + " mt-1.5"} value={modelDraft.category} onChange={(event) => setModelDraft({ ...modelDraft, category: event.target.value })} /></label><label className="block text-xs font-semibold text-slate-600">Largura padrão (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0.01" step="0.01" value={modelDraft.defaultWidth} onChange={(event) => setModelDraft({ ...modelDraft, defaultWidth: number(event.target.value) })} /></label><label className="block text-xs font-semibold text-slate-600">Avanço/altura padrão (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0.01" step="0.01" value={modelDraft.defaultDepth} onChange={(event) => setModelDraft({ ...modelDraft, defaultDepth: number(event.target.value) })} /></label><label className="block text-xs font-semibold text-slate-600">Distância máxima entre travessas (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0.1" step="0.05" value={modelDraft.crossbarSpacing ?? 0.7} onChange={(event) => setModelDraft({ ...modelDraft, crossbarSpacing: Math.max(0.1, number(event.target.value)) })} /><span className="mt-1 block font-normal text-slate-500">Ex.: 0,70 m, 0,80 m ou 1,00 m. A quantidade é recalculada pela largura.</span></label><label className="block text-xs font-semibold text-slate-600 sm:col-span-2">Descrição e observações<Input className={fieldClass + " mt-1.5"} value={modelDraft.description} onChange={(event) => setModelDraft({ ...modelDraft, description: event.target.value })} /></label></div>
-      <div className="mt-6 flex items-center justify-between gap-3"><h3 className="font-bold text-slate-900">Materiais e regras de consumo</h3><Button size="sm" variant="outline" onClick={() => setModelDraft({ ...modelDraft, materials: [...modelDraft.materials, newMaterial()] })}><Plus size={14} className="mr-1" /> Adicionar material</Button></div>
-      <div className="mt-3 space-y-4">{modelDraft.materials.map((item, index) => <div key={item.id} className="rounded-xl border border-slate-200 p-4"><div className="mb-3 flex items-center justify-between gap-3"><p className="text-sm font-bold text-slate-800">Material {index + 1}</p><Button size="sm" variant="ghost" onClick={() => setModelDraft({ ...modelDraft, materials: modelDraft.materials.filter((material) => material.id !== item.id) })}><Trash2 size={14} className="mr-1" /> Remover</Button></div><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><label className="block text-xs font-semibold text-slate-600">Nome do material<Input className={fieldClass + " mt-1.5"} value={item.name} onChange={(event) => updateMaterial(item.id, { name: event.target.value })} /></label><label className="block text-xs font-semibold text-slate-600">Tipo<select className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={item.type} onChange={(event) => updateMaterial(item.id, { type: event.target.value as MaterialType })}><option value="linear">Barra/perfil linear</option><option value="sheet">Chapa/lona/rolo</option><option value="unit">Unidade/acessório</option></select></label><label className="block text-xs font-semibold text-slate-600">Comprimento comercial (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={item.stockLength} onChange={(event) => updateMaterial(item.id, { stockLength: number(event.target.value) })} /></label><label className="block text-xs font-semibold text-slate-600">Largura comercial (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={item.stockWidth} onChange={(event) => updateMaterial(item.id, { stockWidth: number(event.target.value) })} /></label><label className="block text-xs font-semibold text-slate-600">Preço cheio por barra/chapa/unidade (R$)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={item.stockPrice} onChange={(event) => updateMaterial(item.id, { stockPrice: number(event.target.value) })} /></label><label className="block text-xs font-semibold text-slate-600">Quantidade de peças por toldo<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="1" value={item.count} onChange={(event) => updateMaterial(item.id, { count: number(event.target.value) })} /></label>{item.type === "linear" && <label className="flex items-center gap-2 rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-700"><input type="checkbox" checked={Boolean(item.spacingBased)} onChange={(event) => updateMaterial(item.id, { spacingBased: event.target.checked })} /> Calcular quantidade pela distância entre travessas</label>}<label className="block text-xs font-semibold text-slate-600">Fórmula da medida A<select className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={item.formulaA} onChange={(event) => updateMaterial(item.id, { formulaA: event.target.value as DimensionFormula })}>{dimensionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>{item.type === "sheet" && <label className="block text-xs font-semibold text-slate-600">Fórmula da medida B<select className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={item.formulaB} onChange={(event) => updateMaterial(item.id, { formulaB: event.target.value as DimensionFormula })}>{dimensionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>}{item.formulaA === "fixed" && <label className="block text-xs font-semibold text-slate-600">Medida fixa A (m/un.)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={item.fixedA} onChange={(event) => updateMaterial(item.id, { fixedA: number(event.target.value) })} /></label>}{item.type === "sheet" && item.formulaB === "fixed" && <label className="block text-xs font-semibold text-slate-600">Medida fixa B (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={item.fixedB} onChange={(event) => updateMaterial(item.id, { fixedB: number(event.target.value) })} /></label>}{item.type === "linear" && <label className="block text-xs font-semibold text-slate-600">Perda da serra por corte (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.001" value={item.kerf} onChange={(event) => updateMaterial(item.id, { kerf: number(event.target.value) })} /></label>}</div><p className="mt-3 text-xs leading-5 text-slate-500">{item.type === "linear" ? (item.spacingBased ? "A quantidade é calculada automaticamente pela largura do toldo e pela distância máxima configurada entre travessas." : "O sistema combina os cortes em barras comerciais e mostra o comprimento restante de cada barra. A quantidade usa o valor informado na ficha técnica.") : item.type === "sheet" ? "O sistema monta painéis retangulares, divide automaticamente medidas maiores que a chapa/rolo e lista cada retalho retangular. Ajuste a ficha para considerar emendas e folgas reais." : "O sistema calcula o número de unidades e o custo conforme a quantidade cadastrada."}</p></div>)}</div>
-      <div className="mt-6 flex flex-col-reverse justify-end gap-2 sm:flex-row"><Button variant="outline" onClick={() => setModelDraft(null)}>Cancelar</Button><Button onClick={saveModel} className="bg-orange-600 text-white hover:bg-orange-700"><Save size={16} className="mr-2" /> Salvar ficha técnica</Button></div>
-    </div></div>}
+    {activeTab === "history" && <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-slate-900">Histórico de cálculos</h2><p className="mt-1 text-sm text-slate-500">Cálculos salvos por esta empresa.</p></div><Button variant="outline" onClick={() => setActiveTab("calculate")}><Calculator size={16} className="mr-2" /> Novo cálculo</Button></div>
+      {projects.length === 0 ? <div className="mt-5 rounded-xl bg-slate-50 p-8 text-center"><Layers3 className="mx-auto text-slate-400" size={28} /><p className="mt-3 text-sm font-semibold text-slate-700">Nenhum cálculo salvo ainda</p><p className="mt-1 text-xs text-slate-500">Informe duas medidas e salve o primeiro cálculo.</p></div> : <div className="mt-5 space-y-3">{projects.map((project) => <article key={project.id} className="rounded-xl border border-slate-200 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold text-slate-900">{project.name}</h3><p className="mt-1 text-xs text-slate-500">{project.modelName} · {formatDimension(project.width)} × {formatDimension(project.depth)} · {new Date(project.createdAt).toLocaleString("pt-BR")}</p></div><div className="text-right"><p className="text-lg font-extrabold text-slate-900">{money(project.result.suggestedPrice)}</p><p className="text-xs text-slate-500">Preço sugerido</p></div></div><div className="mt-3 grid gap-2 sm:grid-cols-3"><div className="rounded-lg bg-slate-50 p-3"><p className="text-[10px] text-slate-500">Compra</p><p className="font-bold text-slate-800">{money(project.result.purchaseCost)}</p></div><div className="rounded-lg bg-slate-50 p-3"><p className="text-[10px] text-slate-500">Sobras</p><p className="font-bold text-slate-800">{money(project.result.scrapValue)}</p></div><div className="rounded-lg bg-slate-50 p-3"><p className="text-[10px] text-slate-500">Custo usado</p><p className="font-bold text-slate-800">{money(project.result.totalCost)}</p></div></div></article>)}</div>}
+    </section>}
   </div>;
 }
