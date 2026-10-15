@@ -1,5 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+type WhatsAppMessage = { id?: string; type?: string; from?: string; text?: { body?: string } };
+type WhatsAppValue = { metadata?: { phone_number_id?: string }; messages?: WhatsAppMessage[] };
+type WhatsAppPayload = { entry?: Array<{ changes?: Array<{ field?: string; value?: WhatsAppValue }> }> };
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 const GRAPH_VERSION = Deno.env.get("WHATSAPP_GRAPH_VERSION") || "v23.0";
 const encoder = new TextEncoder();
 
@@ -54,22 +62,26 @@ Deno.serve(async (request) => {
   if (!supabaseUrl || !serviceRole || !accessToken) return json(503, { error: "WhatsApp webhook secrets are not configured" });
 
   const admin = createClient(supabaseUrl, serviceRole, { auth: { persistSession: false, autoRefreshToken: false } });
-  let payload: any;
-  try { payload = JSON.parse(rawBody); } catch { return json(400, { error: "Invalid JSON" }); }
+  let payload: WhatsAppPayload;
+  try {
+    const decoded: unknown = JSON.parse(rawBody);
+    if (!isJsonRecord(decoded) || !Array.isArray(decoded.entry)) return json(400, { error: "Invalid WhatsApp payload" });
+    payload = decoded as WhatsAppPayload;
+  } catch { return json(400, { error: "Invalid JSON" }); }
 
   for (const entry of payload.entry ?? []) {
-    for (const change of entry.changes ?? []) {
+    for (const change of Array.isArray(entry?.changes) ? entry.changes : []) {
       if (change.field !== "messages") continue;
       const value = change.value ?? {};
       const phoneNumberId = value.metadata?.phone_number_id;
-      if (!phoneNumberId) continue;
+      if (typeof phoneNumberId !== "string" || !phoneNumberId) continue;
       const { data: connection } = await admin.from("whatsapp_connections")
         .select("id,company_id,phone_number_id,status")
         .eq("phone_number_id", phoneNumberId).eq("status", "connected").maybeSingle();
       if (!connection) continue;
 
-      for (const message of value.messages ?? []) {
-        if (!message.id || message.type !== "text" || !message.from) continue;
+      for (const message of Array.isArray(value.messages) ? value.messages : []) {
+        if (!message || typeof message.id !== "string" || !message.id || message.type !== "text" || typeof message.from !== "string" || !message.from) continue;
         const text = String(message.text?.body ?? "").trim().slice(0, 4000);
         if (!text) continue;
         const { error: insertError } = await admin.from("whatsapp_message_events").insert({
