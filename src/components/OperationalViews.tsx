@@ -146,7 +146,19 @@ function ReportsModule() {
 
 function SettingsModule() {
   const access = useCompanyAccess();
-  const [settings, setSettings] = useState({ dark: false, camera: true, gps: true, pwa: true, sync: true, notifications: true });
+  const settingsKey = `toldo:settings:${access.user.id}`;
+  const [settings, setSettings] = useState(() => {
+    const defaults = { dark: false, camera: true, gps: true, pwa: true, sync: true, notifications: true };
+    try {
+      const saved = window.localStorage.getItem(settingsKey);
+      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch {
+      return defaults;
+    }
+  });
+  useEffect(() => {
+    window.localStorage.setItem(settingsKey, JSON.stringify(settings));
+  }, [settingsKey, settings]);
   const [editOpen, setEditOpen] = useState(false);
   const [savingCompany, setSavingCompany] = useState(false);
   const [loadingCompany, setLoadingCompany] = useState(false);
