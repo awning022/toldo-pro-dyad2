@@ -8,13 +8,15 @@ type PrivateRecord = { record_id: string; data: Record<string, unknown> };
 
 const privateQuoteFields = ["cost", "margin", "finalValue"] as const;
 
-function splitRecord<T extends { id: string }>(record: T) {
+function splitRecord<T extends { id: string }>(record: T, splitPrivate = true) {
   const data = { ...record } as Record<string, unknown>;
   const privateData: Record<string, unknown> = {};
-  for (const field of privateQuoteFields) {
-    if (field in data) {
-      privateData[field] = data[field];
-      delete data[field];
+  if (splitPrivate) {
+    for (const field of privateQuoteFields) {
+      if (field in data) {
+        privateData[field] = data[field];
+        delete data[field];
+      }
     }
   }
   return { record_id: record.id, data, privateData };
@@ -105,9 +107,12 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
     void load();
   }, [load]);
 
-  const save = useCallback(async (next: T[], previous: T[]) => {
-    if (!supabase) return;
-    if (!enabled) return;
+  const save = useCallback(async (next: T[], previous: T[]): Promise<boolean> => {
+    if (!supabase) {
+      toast.error("O acesso ao banco de dados não está configurado.");
+      return false;
+    }
+    if (!enabled) return true;
     const previousById = new Map(previous.map((record) => [record.id, record]));
     const nextById = new Map(next.map((record) => [record.id, record]));
     const changed = next.filter((record) => JSON.stringify(previousById.get(record.id)) !== JSON.stringify(record));
@@ -116,8 +121,7 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
     if (entity === "finance") {
       if (!canEditFinance) {
         toast.error("Seu cargo não pode editar lançamentos financeiros.");
-        void load();
-        return;
+        return false;
       }
       if (changed.length) {
         const { error } = await supabase.from("operational_private_records").upsert(
@@ -126,8 +130,7 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
         );
         if (error) {
           toast.error("Não foi possível salvar os lançamentos. Confira sua permissão.");
-          void load();
-          return;
+          return false;
         }
       }
       if (removed.length) {
@@ -135,17 +138,21 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
           .eq("company_id", companyId).eq("entity", entity).in("record_id", removed.map((record) => record.id));
         if (error) {
           toast.error("Não foi possível excluir os lançamentos financeiros.");
-          void load();
+          return false;
         }
       }
-      return;
+      return true;
     }
 
+    const rows = changed.map((record) => {
+      const { privateData, ...publicRecord } = splitRecord(record, entity === "quotes");
+      return { publicRecord, privateData };
+    });
+    if (entity === "quotes" && !canViewFinancial && rows.some((row) => Object.keys(row.privateData).length > 0)) {
+      toast.error("Seu cargo não pode alterar valores financeiros.");
+      return false;
+    }
     if (changed.length) {
-      const rows = changed.map((record) => {
-        const { privateData, ...publicRecord } = splitRecord(record);
-        return { publicRecord, privateData };
-      });
       const { error } = await supabase.from("operational_records").upsert(
         rows.map(({ publicRecord }) => ({
           company_id: companyId,
@@ -157,30 +164,34 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
       );
       if (error) {
         toast.error("Não foi possível salvar as alterações. Confira as permissões do seu cargo.");
-        void load();
-        return;
+        return false;
       }
 
-      const privateRows = rows.filter((row) => Object.keys(row.privateData).length > 0);
-      if (entity === "quotes" && privateRows.length) {
-        if (!canViewFinancial) {
-          toast.error("Seu cargo não pode alterar valores financeiros.");
-          void load();
-          return;
+      if (entity === "quotes" && canViewFinancial) {
+        const privateRows = rows.filter((row) => Object.keys(row.privateData).length > 0);
+        if (privateRows.length) {
+          const { error: privateError } = await supabase.from("operational_private_records").upsert(
+            privateRows.map((row) => ({
+              company_id: companyId,
+              entity: "quotes",
+              record_id: row.publicRecord.record_id,
+              data: row.privateData,
+            })),
+            { onConflict: "company_id,entity,record_id" },
+          );
+          if (privateError) {
+            toast.error("Os dados operacionais foram salvos, mas os valores financeiros não foram atualizados.");
+            return false;
+          }
         }
-        const { error: privateError } = await supabase.from("operational_private_records").upsert(
-          privateRows.map((row) => ({
-            company_id: companyId,
-            entity: "quotes",
-            record_id: row.publicRecord.record_id,
-            data: row.privateData,
-          })),
-          { onConflict: "company_id,entity,record_id" },
-        );
-        if (privateError) {
-          toast.error("Os dados operacionais foram salvos, mas os valores financeiros não foram atualizados.");
-          void load();
-          return;
+        const clearedIds = rows.filter((row) => Object.keys(row.privateData).length === 0).map((row) => row.publicRecord.record_id);
+        if (clearedIds.length) {
+          const { error: clearError } = await supabase.from("operational_private_records").delete()
+            .eq("company_id", companyId).eq("entity", "quotes").in("record_id", clearedIds);
+          if (clearError) {
+            toast.error("O orçamento foi salvo, mas não foi possível limpar os valores financeiros removidos.");
+            return false;
+          }
         }
       }
     }
@@ -191,16 +202,21 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
         .eq("company_id", companyId).eq("entity", entity).in("record_id", ids);
       if (error) {
         toast.error("Não foi possível excluir os registros. Confira sua permissão.");
-        void load();
-        return;
+        return false;
       }
       if (entity === "quotes" && canViewFinancial) {
         const { error: privateError } = await supabase.from("operational_private_records").delete()
           .eq("company_id", companyId).eq("entity", "quotes").in("record_id", ids);
-        if (privateError) toast.error("Os registros foram removidos, mas alguns dados financeiros antigos permaneceram.");
+        if (privateError) {
+          toast.error("Os registros foram removidos, mas alguns dados financeiros antigos permaneceram.");
+          return false;
+        }
       }
     }
-  }, [canEditFinance, canViewFinancial, companyId, enabled, entity, load]);
+    return true;
+  }, [canEditFinance, canViewFinancial, companyId, enabled, entity]);
+
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const setRecords = useCallback((update: T[] | ((current: T[]) => T[])) => {
     if (!ready) {
@@ -211,8 +227,16 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
     const next = typeof update === "function" ? update(previous) : update;
     recordsRef.current = next;
     setState(next);
-    void save(next, previous);
-  }, [ready, save]);
+    const operation = saveQueueRef.current.catch(() => undefined).then(async () => {
+      const saved = await save(next, previous);
+      if (!saved) await load();
+    });
+    saveQueueRef.current = operation.catch(async (error: unknown) => {
+      console.error("Falha inesperada ao salvar registros da empresa", error);
+      toast.error("Ocorreu um erro inesperado ao salvar. Os dados serão recarregados do banco.");
+      await load();
+    });
+  }, [ready, save, load]);
 
   return { records, setRecords, ready, reload: load };
 }
