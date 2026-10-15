@@ -31,6 +31,10 @@ type CalculatorModel = {
   defaultWidth: number;
   defaultDepth: number;
   crossbarSpacing?: number;
+  laborCost?: number;
+  extraCost?: number;
+  marginPercent?: number;
+  taxPercent?: number;
   materials: MaterialRule[];
   createdAt: string;
   updatedAt: string;
@@ -86,15 +90,12 @@ const defaultModels: CalculatorModel[] = [
   },
   {
     id: "preset-fixo-policarbonato", name: "Toldo fixo em policarbonato", category: "Cobertura fixa",
-    description: "Modelo inicial para cobertura fixa. A divisão em painéis é uma estimativa de corte; revise perfis, emendas e folgas técnicas.",
-    defaultWidth: 5, defaultDepth: 3, crossbarSpacing: 0.7, createdAt: "", updatedAt: "",
+    description: "Calcula peças inteiras, agrupa traseiro, frontal e travessas no mesmo perfil comercial, reaproveita sobras e mantém os pés separados.",
+    defaultWidth: 5, defaultDepth: 3, crossbarSpacing: 0.7, laborCost: 0, extraCost: 0, marginPercent: 30, taxPercent: 0, createdAt: "", updatedAt: "",
     materials: [
       { ...newMaterial("Policarbonato alveolar 6 mm fumê"), id: "fix-chapa", type: "sheet", stockLength: 6, stockWidth: 2.1, formulaA: "width", formulaB: "depth", count: 1, kerf: 0.003 },
-      { ...newMaterial("Perfil traseiro de alumínio"), id: "fix-traseiro", type: "linear", stockLength: 6, formulaA: "width", count: 1 },
-      { ...newMaterial("Perfil frontal de alumínio"), id: "fix-frontal", type: "linear", stockLength: 6, formulaA: "width", count: 1 },
-      { ...newMaterial("Travessas de alumínio (da parede até a frente)"), id: "fix-travessas", type: "linear", stockLength: 6, formulaA: "depth", count: 1, spacingBased: true },
-      { ...newMaterial("Perfis laterais de alumínio"), id: "fix-lateral", type: "linear", stockLength: 6, formulaA: "depth", count: 2 },
-      { ...newMaterial("Calha frontal"), id: "fix-calha", type: "linear", stockLength: 6, formulaA: "width", count: 1 },
+      { ...newMaterial("Perfil principal de alumínio (traseiro, frontal e travessas)"), id: "fix-perfil-principal", type: "linear", stockLength: 6, formulaA: "width", count: 1, kerf: 0.003 },
+      { ...newMaterial("Pés de alumínio (perfil separado)"), id: "fix-pes", type: "linear", stockLength: 6, formulaA: "fixed", fixedA: 2.5, count: 2, kerf: 0.003 },
       { ...newMaterial("Parafusos e acessórios"), id: "fix-paraf", type: "unit", stockLength: 1, stockWidth: 0, formulaA: "fixed", fixedA: 1, count: 12, kerf: 0 },
     ],
   },
@@ -140,8 +141,14 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
       ? Math.max(2, Math.ceil(width / spacing) + 1) * safeQuantity
       : Math.max(0, Math.floor(number(rule.count) * safeQuantity));
     if (rule.type === "linear") {
-      const length = resolveDimension(rule.formulaA, width, depth, rule.fixedA);
-      for (let i = 0; i < count; i += 1) if (length > 0) existing.linearPieces.push(length);
+      if (rule.id === "fix-perfil-principal") {
+        const crossbarCount = Math.max(2, Math.ceil(width / spacing) + 1) * safeQuantity;
+        for (let i = 0; i < 2 * safeQuantity; i += 1) if (width > 0) existing.linearPieces.push(width);
+        for (let i = 0; i < crossbarCount; i += 1) if (depth > 0) existing.linearPieces.push(depth);
+      } else {
+        const length = resolveDimension(rule.formulaA, width, depth, rule.fixedA);
+        for (let i = 0; i < count; i += 1) if (length > 0) existing.linearPieces.push(length);
+      }
     } else if (rule.type === "sheet") {
       const pieceWidth = resolveDimension(rule.formulaA, width, depth, rule.fixedA);
       const pieceLength = resolveDimension(rule.formulaB, width, depth, rule.fixedB);
@@ -153,17 +160,17 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
           }
           const maxAcross = rule.stockWidth;
           const maxAlong = rule.stockLength;
+          if (pieceLength > maxAlong + 0.000001) {
+            warnings.push(rule.name + ": o avanço da peça (" + meters(pieceLength) + ") excede o comprimento comercial (" + meters(maxAlong) + "). Não foi criada emenda; ajuste a chapa comercial ou as medidas.");
+            continue;
+          }
           const widthCuts = Math.ceil(pieceWidth / maxAcross);
-          const lengthCuts = Math.ceil(pieceLength / maxAlong);
-          if (widthCuts > 1 || lengthCuts > 1) {
-            warnings.push(rule.name + ": a peça foi dividida automaticamente em painéis para estimar o consumo. Confira emendas, sobreposições e folgas da ficha técnica.");
+          if (widthCuts > 1) {
+            warnings.push(rule.name + ": a largura precisa de painéis lado a lado; o avanço de cada painel permanece inteiro, sem emenda no sentido do avanço.");
           }
           for (let wi = 0; wi < widthCuts; wi += 1) {
             const panelWidth = Math.min(maxAcross, pieceWidth - wi * maxAcross);
-            for (let li = 0; li < lengthCuts; li += 1) {
-              const panelLength = Math.min(maxAlong, pieceLength - li * maxAlong);
-              existing.rectangles.push({ width: panelWidth, length: panelLength });
-            }
+            existing.rectangles.push({ width: panelWidth, length: pieceLength });
           }
         }
       }
@@ -368,9 +375,6 @@ export function CalculatorView() {
   const [width, setWidth] = useState("5");
   const [depth, setDepth] = useState("3");
   const [projectName, setProjectName] = useState("Cobertura fixa");
-  const [marginPercent, setMarginPercent] = useState("30");
-  const [laborCost, setLaborCost] = useState("0");
-  const [extraCost, setExtraCost] = useState("0");
   const [activeTab, setActiveTab] = useState<"calculate" | "settings" | "history">("calculate");
   const [modelDraft, setModelDraft] = useState<CalculatorModel | null>(null);
 
@@ -385,23 +389,33 @@ export function CalculatorView() {
     }
     // Atualiza a ficha técnica padrão sem apagar preços e dimensões comerciais que a empresa já configurou.
     const existingById = new Map(existing.materials.map((material) => [material.id, material]));
+    const oldFront = existingById.get("fix-frontal");
+    const oldBars = existingById.get("fix-travessas");
+    const oldBack = existingById.get("fix-traseiro");
     const migratedMaterials = fixedTemplate.materials.map((templateMaterial) => {
-      const saved = existingById.get(templateMaterial.id);
+      let saved = existingById.get(templateMaterial.id);
+      if (templateMaterial.id === "fix-perfil-principal") saved = oldFront || oldBars || oldBack || saved;
       if (!saved) return { ...templateMaterial };
       existingById.delete(templateMaterial.id);
       return {
         ...templateMaterial,
-        name: templateMaterial.name,
         stockPrice: saved.stockPrice,
         stockLength: saved.stockLength || templateMaterial.stockLength,
         stockWidth: saved.stockWidth || templateMaterial.stockWidth,
       };
     });
-    // Mantém materiais personalizados que a empresa tenha adicionado.
+    // Remove linhas antigas separadas (agora o perfil principal é único), mas preserva materiais personalizados.
+    ["fix-traseiro", "fix-frontal", "fix-travessas", "fix-lateral", "fix-calha"].forEach((id) => existingById.delete(id));
     migratedMaterials.push(...existingById.values());
-    if (JSON.stringify(existing.materials) !== JSON.stringify(migratedMaterials) || existing.crossbarSpacing == null) {
+    const needsMigration = JSON.stringify(existing.materials) !== JSON.stringify(migratedMaterials)
+      || existing.crossbarSpacing == null || existing.laborCost == null || existing.extraCost == null
+      || existing.marginPercent == null || existing.taxPercent == null;
+    if (needsMigration) {
       setModels(models.map((model) => model.id === fixedTemplate.id
-        ? { ...model, name: fixedTemplate.name, crossbarSpacing: model.crossbarSpacing ?? fixedTemplate.crossbarSpacing, materials: migratedMaterials, updatedAt: now }
+        ? { ...model, name: fixedTemplate.name, crossbarSpacing: model.crossbarSpacing ?? fixedTemplate.crossbarSpacing,
+            laborCost: model.laborCost ?? fixedTemplate.laborCost, extraCost: model.extraCost ?? fixedTemplate.extraCost,
+            marginPercent: model.marginPercent ?? fixedTemplate.marginPercent, taxPercent: model.taxPercent ?? fixedTemplate.taxPercent,
+            materials: migratedMaterials, updatedAt: now }
         : model));
     }
   }, [modelsReady, canEditModels, models, setModels]);
@@ -409,10 +423,13 @@ export function CalculatorView() {
   const selectedModel = models.find((model) => model.id === fixedTemplate.id) || fixedTemplate;
   const parsedWidth = number(width);
   const parsedDepth = number(depth);
-  const parsedMargin = Math.min(99, number(marginPercent));
+  const parsedMargin = Math.min(99, number(selectedModel.marginPercent ?? 30));
+  const configuredLabor = number(selectedModel.laborCost);
+  const configuredExtras = number(selectedModel.extraCost);
+  const configuredTax = number(selectedModel.taxPercent);
   const result = useMemo(
-    () => calculateProject(selectedModel, parsedWidth, parsedDepth, 1, number(laborCost), number(extraCost), parsedMargin, 0),
-    [selectedModel, parsedWidth, parsedDepth, laborCost, extraCost, parsedMargin],
+    () => calculateProject(selectedModel, parsedWidth, parsedDepth, 1, configuredLabor, configuredExtras, parsedMargin, configuredTax),
+    [selectedModel, parsedWidth, parsedDepth, configuredLabor, configuredExtras, parsedMargin, configuredTax],
   );
   const priceConfigured = selectedModel.materials.length > 0 && selectedModel.materials.every((material) => number(material.stockPrice) > 0);
   const fieldClass = "h-10 rounded-xl border-slate-200 bg-white text-sm";
@@ -436,8 +453,8 @@ export function CalculatorView() {
     if (!priceConfigured) { toast.error("Preencha o preço comercial de todos os materiais na aba Configuração antes de salvar o orçamento."); setActiveTab("settings"); return; }
     const project: CalculatorProject = {
       id: uid(), name: projectName.trim() || "Cobertura fixa", modelId: selectedModel.id, modelName: selectedModel.name,
-      width: parsedWidth, depth: parsedDepth, heightDrop: 0, quantity: 1, laborCost: number(laborCost), extraCost: number(extraCost),
-      marginPercent: parsedMargin, taxPercent: 0, result, createdAt: new Date().toISOString(),
+      width: parsedWidth, depth: parsedDepth, heightDrop: 0, quantity: 1, laborCost: configuredLabor, extraCost: configuredExtras,
+      marginPercent: parsedMargin, taxPercent: configuredTax, result, createdAt: new Date().toISOString(),
     };
     setProjects([project, ...projects]);
     toast.success("Cálculo salvo no histórico.");
@@ -485,14 +502,6 @@ export function CalculatorView() {
           <p className="mt-1 text-3xl font-extrabold text-orange-900">{(parsedWidth * parsedDepth).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} m²</p>
           <p className="mt-1 text-xs text-orange-800">Cálculo para 1 cobertura fixa de alumínio com policarbonato.</p>
         </div>
-        <details className="rounded-xl border border-slate-200 p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-slate-700">Custos opcionais e margem</summary>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className={labelClass}>Mão de obra total (R$)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={laborCost} onChange={(event) => setLaborCost(event.target.value)} /></label>
-            <label className={labelClass}>Outros custos (R$)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={extraCost} onChange={(event) => setExtraCost(event.target.value)} /></label>
-            <label className={labelClass}>Margem desejada (%)<Input className={fieldClass + " mt-1.5"} type="number" min="0" max="99" step="1" value={marginPercent} onChange={(event) => setMarginPercent(event.target.value)} /></label>
-          </div>
-        </details>
         {!priceConfigured && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="font-bold">Falta configurar os preços</p><p className="mt-1 text-xs leading-5">O cálculo de cortes aparece, mas o preço final só fica confiável depois de cadastrar o preço de compra de cada material.</p>{canEditModels && <Button className="mt-3 bg-orange-600 text-white hover:bg-orange-700" onClick={() => { setModelDraft({ ...selectedModel, materials: selectedModel.materials.map((material) => ({ ...material })) }); setActiveTab("settings"); }}>Configurar agora</Button>}</div>}
         <Button disabled={parsedWidth <= 0 || parsedDepth <= 0} className="w-full bg-orange-600 py-6 text-base font-bold text-white hover:bg-orange-700" onClick={saveProject}><Save size={18} className="mr-2" /> Salvar cálculo no histórico</Button>
       </section>
@@ -520,8 +529,14 @@ export function CalculatorView() {
     </div>}
 
     {activeTab === "settings" && canEditModels && <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-orange-600">Configuração da empresa</p><h2 className="mt-1 text-xl font-bold text-slate-900">Materiais da cobertura fixa</h2><p className="mt-1 max-w-3xl text-sm text-slate-500">Cadastre o tamanho e o preço de compra do item comercial completo: barra de alumínio, chapa de policarbonato, calha e acessórios. Os valores ficam salvos somente na empresa.</p></div><Button variant="outline" onClick={() => { setModelDraft({ ...selectedModel, materials: selectedModel.materials.map((material) => ({ ...material })) }); toast.info("Configuração recarregada. Alterações não salvas foram descartadas."); }}>Descartar alterações</Button></div>
-      {modelDraft && <div className="grid gap-4 sm:grid-cols-3"><label className={labelClass}>Espaçamento entre travessas (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0.1" step="0.05" value={String(modelDraft.crossbarSpacing ?? 0.7)} onChange={(event) => setModelDraft({ ...modelDraft, crossbarSpacing: number(event.target.value) || 0.7 })} /><span className="mt-1 block text-[11px] font-normal text-slate-500">Usado para estimar quantas travessas vão na largura.</span></label></div>}
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-orange-600">Configuração da empresa</p><h2 className="mt-1 text-xl font-bold text-slate-900">Materiais da cobertura fixa</h2><p className="mt-1 max-w-3xl text-sm text-slate-500">Cadastre os preços comerciais, mão de obra, extras, impostos e margem aqui. O perfil principal é calculado em conjunto (traseiro + frontal + travessas); os pés ficam separados. As configurações são salvas por empresa.</p></div><Button variant="outline" onClick={() => { setModelDraft({ ...selectedModel, materials: selectedModel.materials.map((material) => ({ ...material })) }); toast.info("Configuração recarregada. Alterações não salvas foram descartadas."); }}>Descartar alterações</Button></div>
+      {modelDraft && <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <label className={labelClass}>Espaçamento entre travessas (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0.1" step="0.05" value={String(modelDraft.crossbarSpacing ?? 0.7)} onChange={(event) => setModelDraft({ ...modelDraft, crossbarSpacing: number(event.target.value) || 0.7 })} /><span className="mt-1 block text-[11px] font-normal text-slate-500">Define quantas travessas são calculadas automaticamente.</span></label>
+        <label className={labelClass}>Mão de obra total (R$)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={String(modelDraft.laborCost ?? 0)} onChange={(event) => setModelDraft({ ...modelDraft, laborCost: number(event.target.value) })} /></label>
+        <label className={labelClass}>Outros custos (R$)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={String(modelDraft.extraCost ?? 0)} onChange={(event) => setModelDraft({ ...modelDraft, extraCost: number(event.target.value) })} /></label>
+        <label className={labelClass}>Impostos (%)<Input className={fieldClass + " mt-1.5"} type="number" min="0" max="99" step="0.5" value={String(modelDraft.taxPercent ?? 0)} onChange={(event) => setModelDraft({ ...modelDraft, taxPercent: number(event.target.value) })} /></label>
+        <label className={labelClass}>Margem de lucro (%)<Input className={fieldClass + " mt-1.5"} type="number" min="0" max="99" step="1" value={String(modelDraft.marginPercent ?? 30)} onChange={(event) => setModelDraft({ ...modelDraft, marginPercent: number(event.target.value) })} /></label>
+      </div>}
       {!modelDraft && <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-600">Clique em “Editar configuração” para alterar os materiais.</div>}
       {modelDraft && <div className="space-y-4">{modelDraft.materials.map((material, index) => <article key={material.id} className="rounded-2xl border border-slate-200 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-wide text-orange-600">Material {index + 1}</p><h3 className="mt-1 text-base font-bold text-slate-900">{material.name}</h3><p className="mt-1 text-xs text-slate-500">Preço do item comercial completo: {money(number(material.stockPrice))}</p></div><Button variant="outline" size="sm" onClick={() => setModelDraft({ ...modelDraft, materials: modelDraft.materials.filter((item) => item.id !== material.id) })}><Trash2 size={14} className="mr-1" /> Remover</Button></div>
@@ -547,7 +562,7 @@ export function CalculatorView() {
         </details>
       </article>)}</div>}
       {modelDraft && <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setModelDraft({ ...selectedModel, materials: selectedModel.materials.map((material) => ({ ...material })) })}>Cancelar</Button><Button variant="outline" onClick={() => setModelDraft({ ...modelDraft, materials: [...modelDraft.materials, newMaterial("Novo perfil ou acessório")] })}><Plus size={16} className="mr-2" /> Adicionar material</Button><Button className="bg-orange-600 text-white hover:bg-orange-700" onClick={saveSettings}><Save size={16} className="mr-2" /> Salvar configuração</Button></div>}
-      <p className="text-xs leading-5 text-slate-500">Importante: a ficha técnica inicial é uma referência. Ajuste quantidades de perfis, calha, chapas e acessórios ao padrão real de fabricação da sua cobertura. A estimativa de sobras é matemática e precisa ser conferida antes do corte.</p>
+      <p className="text-xs leading-5 text-slate-500">O perfil principal usa uma única lista de cortes para traseiro, frontal e travessas, aproveitando sobras sem emendar peças. Os pés são calculados separadamente. Configure o comprimento dos pés na regra de consumo do material “Pés de alumínio”. Confirme as medidas de fabricação e folgas antes de cortar.</p>
     </section>}
 
     {activeTab === "history" && <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
