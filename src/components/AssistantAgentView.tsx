@@ -38,7 +38,7 @@ function actionLabel(action: AgentAction) {
 
 function ActionPreview({ action, busy, onConfirm }: { action: AgentAction; busy: boolean; onConfirm: () => void }) {
   const data = action.data || {};
-  const fields = Object.entries(data).filter(([key, value]) => value !== undefined && value !== null && value !== "" && !["modelId"].includes(key));
+  const fields = Object.entries(data).filter(([key, value]) => value !== undefined && value !== null && value !== "" && !["modelId", "preview"].includes(key));
   return <div className="mt-3 rounded-2xl border border-[#f3c49f] bg-[#fff9f4] p-4">
     <div className="flex items-center gap-2 text-[#b95412]"><ShieldCheck size={16} /><p className="text-[12px] font-extrabold">Ação aguardando sua confirmação</p></div>
     <p className="mt-1 text-[11px] text-[#8b6b54]">A IA só grava alterações depois que você confirmar. Confira os dados antes de prosseguir.</p>
