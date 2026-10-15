@@ -102,14 +102,14 @@ function WorkOrdersModule() {
 
 function ReportsModule() {
   const access = useCompanyAccess();
-  const { records: quotes } = useCompanyRecords<WorkflowQuote>("quotes");
-  const { records: leads } = useCompanyRecords<{ id: string; name?: string; value?: string; stage: string }>("leads");
-  const { records: workOrders } = useCompanyRecords<WorkflowOS>("work_orders");
-  const { records: production } = useCompanyRecords<WorkflowProduction>("production");
-  const { records: installations } = useCompanyRecords<WorkflowInstallation>("installations");
-  const { records: materials } = useCompanyRecords<StockMaterial>("materials");
-  const { records: clients } = useCompanyRecords<WorkflowClient>("customers");
-  const { records: finance } = useCompanyRecords<FinanceEntry>("finance");
+  const { records: quotes } = useCompanyRecords<WorkflowQuote>("quotes", { enabled: access.can("manageQuotes") });
+  const { records: leads } = useCompanyRecords<{ id: string; name?: string; value?: string; stage: string }>("leads", { enabled: access.can("manageCustomers") });
+  const { records: workOrders } = useCompanyRecords<WorkflowOS>("work_orders", { enabled: access.can("issueOS") });
+  const { records: production } = useCompanyRecords<WorkflowProduction>("production", { enabled: access.can("manageProduction") });
+  const { records: installations } = useCompanyRecords<WorkflowInstallation>("installations", { enabled: access.can("manageInstallations") });
+  const { records: materials } = useCompanyRecords<StockMaterial>("materials", { enabled: access.can("manageStock") || access.can("manageProduction") || access.can("manageInstallations") || access.can("requestMaterials") });
+  const { records: clients } = useCompanyRecords<WorkflowClient>("customers", { enabled: access.can("manageCustomers") });
+  const { records: finance } = useCompanyRecords<FinanceEntry>("finance", { enabled: access.can("viewFinancial") });
   const money = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const closedLeads = leads.filter((lead) => lead.stage === "Fechado").length;
   const completedProduction = production.filter((item) => item.status === "Concluída").length;
