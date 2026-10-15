@@ -211,7 +211,7 @@ function accessibleModules(access: CompanyAccess): ModuleKey[] {
     ["clientes", access.can("manageCustomers")],
     ["vendas", access.can("manageCustomers")],
     ["orcamentos", access.can("manageQuotes")],
-    ["calculadora", access.can("manageQuotes") || access.can("manageProduction") || access.can("editRules")],
+    ["calculadora", access.can("manageQuotes") || access.can("editRules")],
     ["os", access.can("issueOS")],
     ["operacao", access.can("manageProduction")],
     ["instalacoes", access.can("manageInstallations")],
