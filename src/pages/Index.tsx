@@ -76,6 +76,7 @@ const navGroups = [
     { label: "Relatórios", module: "relatorios" as ModuleKey, icon: FileBarChart },
   ] },
   { label: "Tecnologia", items: [
+    { label: "Equipe e permissões", module: "equipe" as ModuleKey, icon: Users },
     { label: "IA Toldo Pro", module: "assistente" as ModuleKey, icon: Sparkles },
     { label: "Configurações", module: "configuracoes" as ModuleKey, icon: Settings },
   ] },
@@ -207,7 +208,7 @@ function accessibleModules(access: CompanyAccess): ModuleKey[] {
   const allowed = [
     ["agenda", access.can("manageAgenda")],
     ["notificacoes", access.can("readNotifications")],
-    ["crm", access.can("manageQuotes") || access.can("manageCustomers")],
+    ["crm", access.can("manageQuotes")],
     ["clientes", access.can("manageCustomers")],
     ["vendas", access.can("manageCustomers")],
     ["orcamentos", access.can("manageQuotes")],
@@ -220,6 +221,7 @@ function accessibleModules(access: CompanyAccess): ModuleKey[] {
     ["relatorios", access.can("viewFinancial") || access.can("manageCustomers") || access.can("manageProduction")],
     ["assistente", access.can("accessAssistant")],
     ["configuracoes", access.can("editRules")],
+    ["equipe", access.can("editRules")],
   ] as const;
   allowed.forEach(([module, enabled]) => { if (enabled) modules.push(module); });
   return modules;
