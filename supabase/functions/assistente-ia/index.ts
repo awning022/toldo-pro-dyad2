@@ -10,6 +10,24 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
   status, headers: { ...corsHeaders, "Content-Type": "application/json" },
 });
 
+type JsonRecord = Record<string, unknown>;
+
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function apiErrorMessage(value: unknown): string {
+  if (!isJsonRecord(value) || !isJsonRecord(value.error)) return "";
+  return typeof value.error.message === "string" ? value.error.message : "";
+}
+
+function geminiOutputText(value: unknown): string {
+  if (!isJsonRecord(value) || !Array.isArray(value.candidates)) return "";
+  const candidate = value.candidates[0];
+  if (!isJsonRecord(candidate) || !isJsonRecord(candidate.content) || !Array.isArray(candidate.content.parts)) return "";
+  return candidate.content.parts.map((part) => isJsonRecord(part) && typeof part.text === "string" ? part.text : "").join("");
+}
+
 type AgentAction = { type: string; data: Record<string, unknown> };
 type Row = { record_id: string; data: Record<string, unknown>; entity: string };
 
@@ -426,7 +444,7 @@ Deno.serve(async (req) => {
         if (contents.length > 14) contents.splice(0, contents.length - 14);
         console.log("[assistente-ia] Iniciando chamada Gemini", { model, historyCount: contents.length, contextRecordCount: scopedContextRecords.length });
         let geminiResponse: Response | null = null;
-        let geminiData: any = {};
+        let geminiData: Record<string, unknown> = {};
         let geminiRaw = "";
         let lastGeminiError = "";
         const modelsToTry = [...new Set(["gemini-3.5-flash-lite", "gemini-3.8-flash", model])].slice(0, 3);
@@ -444,14 +462,17 @@ Deno.serve(async (req) => {
               signal: AbortSignal.timeout(20000),
             });
             const candidateRaw = await candidateResponse.text();
-            let candidateData: any = {};
-            try { candidateData = candidateRaw ? JSON.parse(candidateRaw) : {}; } catch { /* resposta inválida será tratada abaixo */ }
+            let candidateData: Record<string, unknown> = {};
+            try {
+              const decoded: unknown = candidateRaw ? JSON.parse(candidateRaw) : {};
+              if (isJsonRecord(decoded)) candidateData = decoded;
+            } catch { /* resposta inválida será tratada abaixo */ }
             geminiResponse = candidateResponse;
             geminiRaw = candidateRaw;
             geminiData = candidateData;
-            console.log("[assistente-ia] Resultado do modelo Gemini", { model: candidateModel, status: candidateResponse.status, ok: candidateResponse.ok, apiMessage: candidateData?.error?.message || "" });
+            console.log("[assistente-ia] Resultado do modelo Gemini", { model: candidateModel, status: candidateResponse.status, ok: candidateResponse.ok, apiMessage: apiErrorMessage(candidateData) });
             if (candidateResponse.ok) break;
-            lastGeminiError = candidateData?.error?.message || `HTTP ${candidateResponse.status}`;
+            lastGeminiError = apiErrorMessage(candidateData) || `HTTP ${candidateResponse.status}`;
             if (![408, 429, 500, 502, 503, 504].includes(candidateResponse.status)) break;
           } catch (fetchError) {
             lastGeminiError = fetchError instanceof Error ? fetchError.message : String(fetchError);
@@ -466,7 +487,7 @@ Deno.serve(async (req) => {
           console.error("[assistente-ia] Todos os modelos falharam", { error: lastGeminiError });
           return json({ conversationId: currentConversation, reply: friendlyReply, action: null, temporaryProviderFailure: true });
         }
-        const output = geminiData?.candidates?.[0]?.content?.parts?.map((part: { text?: string }) => part.text || "").join("") || "";
+        const output = geminiOutputText(geminiData);
         let parsed: { reply?: string; action?: AgentAction };
         try { parsed = JSON.parse(output); } catch { parsed = { reply: output || "Não consegui estruturar a resposta. Tente reformular a solicitação.", action: { type: "none", data: {} } }; }
         let reply = String(parsed.reply || "Como posso ajudar a gerir a sua empresa hoje?");
