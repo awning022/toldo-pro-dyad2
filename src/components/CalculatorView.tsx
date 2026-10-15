@@ -22,6 +22,7 @@ type MaterialRule = {
   count: number;
   kerf: number;
   spacingBased?: boolean;
+  allowRotation?: boolean;
 };
 type CalculatorModel = {
   id: string;
@@ -93,7 +94,7 @@ const defaultModels: CalculatorModel[] = [
     description: "Calcula peças inteiras, agrupa traseiro, frontal e travessas no mesmo perfil comercial, reaproveita sobras e mantém os pés separados.",
     defaultWidth: 5, defaultDepth: 3, crossbarSpacing: 0.7, laborCost: 0, extraCost: 0, marginPercent: 30, taxPercent: 0, createdAt: "", updatedAt: "",
     materials: [
-      { ...newMaterial("Policarbonato alveolar 6 mm fumê"), id: "fix-chapa", type: "sheet", stockLength: 6, stockWidth: 2.1, formulaA: "width", formulaB: "depth", count: 1, kerf: 0.003 },
+      { ...newMaterial("Policarbonato alveolar 6 mm fumê"), id: "fix-chapa", type: "sheet", stockLength: 6, stockWidth: 2.1, formulaA: "width", formulaB: "depth", count: 1, kerf: 0.003, allowRotation: false },
       { ...newMaterial("Perfil principal de alumínio (traseiro, frontal e travessas)"), id: "fix-perfil-principal", type: "linear", stockLength: 6, formulaA: "width", count: 1, kerf: 0 },
       { ...newMaterial("Pés de alumínio (perfil separado)"), id: "fix-pes", type: "linear", stockLength: 6, formulaA: "fixed", fixedA: 2.5, count: 2, kerf: 0.003 },
       { ...newMaterial("Parafusos e acessórios"), id: "fix-paraf", type: "unit", stockLength: 1, stockWidth: 0, formulaA: "fixed", fixedA: 1, count: 12, kerf: 0 },
@@ -134,7 +135,7 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
   const groups = new Map<string, { rule: MaterialRule; linearPieces: number[]; rectangles: { width: number; length: number }[]; units: number }>();
   const safeQuantity = Math.max(1, Math.floor(quantity));
   model.materials.forEach((rule) => {
-    const key = [rule.type, rule.name.trim().toLowerCase(), number(rule.stockLength), number(rule.stockWidth), number(rule.stockPrice), number(rule.kerf)].join("|");
+    const key = [rule.type, rule.name.trim().toLowerCase(), number(rule.stockLength), number(rule.stockWidth), number(rule.stockPrice), number(rule.kerf), rule.allowRotation !== false].join("|");
     const existing = groups.get(key) || { rule, linearPieces: [], rectangles: [], units: 0 };
     const spacing = Math.max(0.01, number(model.crossbarSpacing ?? 0.7));
     const count = rule.spacingBased
@@ -239,7 +240,7 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
         let best: { stockIndex: number; freeIndex: number; rotated: boolean; score: number } | null = null;
         stocks.forEach((stock, stockIndex) => stock.free.forEach((free, freeIndex) => {
           const fits = rect.width <= free.width + 0.000001 && rect.length <= free.length + 0.000001;
-          const rotates = rect.length <= free.width + 0.000001 && rect.width <= free.length + 0.000001;
+          const rotates = rule.allowRotation !== false && rect.length <= free.width + 0.000001 && rect.width <= free.length + 0.000001;
           const currentBest = best as { stockIndex: number; freeIndex: number; rotated: boolean; score: number } | null;
           if (fits) {
             const score = free.width * free.length - rect.width * rect.length;
@@ -477,7 +478,7 @@ export function CalculatorView() {
       <div>
         <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-orange-600">Cálculo rápido</p>
         <h1 className="font-display text-3xl font-bold tracking-tight text-slate-900">Cobertura fixa</h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-500">Informe largura e avanço. A calculadora estima alumínio, policarbonato, calha, compra de materiais, sobras e preço sugerido com base na configuração da sua empresa.</p>
+        <p className="mt-2 max-w-2xl text-sm text-slate-500">Informe largura e avanço. A calculadora estima os materiais cadastrados, cortes sem emendas, sobras e preço sugerido com base na configuração da sua empresa.</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" onClick={() => setActiveTab("history")}><Layers3 size={16} className="mr-2" /> Histórico ({projects.length})</Button>
@@ -550,6 +551,7 @@ export function CalculatorView() {
           <label className={labelClass}>Tipo<select className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" value={material.type} onChange={(event) => updateDraftMaterial(material.id, { type: event.target.value as MaterialType })}><option value="linear">Perfil, barra ou calha</option><option value="sheet">Chapa de policarbonato</option><option value="unit">Acessório por unidade</option></select></label>
           {material.type !== "unit" && <label className={labelClass}>Comprimento comercial (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={String(material.stockLength)} onChange={(event) => updateDraftMaterial(material.id, { stockLength: number(event.target.value) })} /></label>}
           {material.type === "sheet" && <label className={labelClass}>Largura comercial (m)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={String(material.stockWidth)} onChange={(event) => updateDraftMaterial(material.id, { stockWidth: number(event.target.value) })} /></label>}
+          {material.type === "sheet" && <label className="flex items-center gap-2 text-xs font-semibold text-slate-600"><input type="checkbox" checked={material.allowRotation !== false} onChange={(event) => updateDraftMaterial(material.id, { allowRotation: event.target.checked })} /> Permitir girar a peça em 90°</label>}
           <label className={labelClass}>Preço de compra (R$)<Input className={fieldClass + " mt-1.5"} type="number" min="0" step="0.01" value={String(material.stockPrice)} onChange={(event) => updateDraftMaterial(material.id, { stockPrice: number(event.target.value) })} /><span className="mt-1 block text-[11px] font-normal text-slate-500">{material.type === "linear" ? "Preço de uma barra/perfil completo" : material.type === "sheet" ? "Preço de uma chapa completa" : "Preço de uma unidade"}</span></label>
         </div>
         <details className="mt-4 rounded-xl bg-slate-50 p-3">
