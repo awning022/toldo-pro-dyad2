@@ -139,9 +139,9 @@ function quoteTone(status: WorkflowQuoteStatus) {
 
 function WorkflowQuotesView({ onModuleChange }: WorkflowViewProps) {
   const role = getCurrentWorkflowRole();
-  const [quotes, setQuotes] = useWorkflowList<WorkflowQuote>(quoteKey, defaultWorkflowQuotes, (value, index) => normalizeQuote(value, index));
-  const [clients, setClients] = useWorkflowList<WorkflowClient>(clientKey, defaultWorkflowClients, (value, index) => normalizeClient(value, index));
-  const [orders, setOrders] = useWorkflowList<WorkflowOS>(osKey, defaultWorkflowOS, (value, index) => normalizeOS(value, index));
+  const [quotes, setQuotes, reloadQuotes] = useWorkflowList<WorkflowQuote>(quoteKey, defaultWorkflowQuotes, (value, index) => normalizeQuote(value, index));
+  const [clients, , reloadClients] = useWorkflowList<WorkflowClient>(clientKey, defaultWorkflowClients, (value, index) => normalizeClient(value, index));
+  const [orders, , reloadOrders] = useWorkflowList<WorkflowOS>(osKey, defaultWorkflowOS, (value, index) => normalizeOS(value, index));
   const [productions] = useWorkflowList<WorkflowProduction>(productionKey, defaultWorkflowProduction, (value, index) => normalizeProduction(value, index));
   const [expanded, setExpanded] = useState<string | null>(() => window.localStorage.getItem("toldo:workflow-selected-quote"));
   const [form, setForm] = useState<"new" | "edit" | null>(null);
@@ -152,32 +152,66 @@ function WorkflowQuotesView({ onModuleChange }: WorkflowViewProps) {
   const convert = (quote: WorkflowQuote) => {
     if (!canWorkflow(role, "convertClient")) return toast.error("Seu perfil não pode converter orçamento em cliente.");
     if (quote.status !== "Aprovado") return toast.error("Aprove o orçamento antes de converter em cliente.");
-    const existingClient = clients.find((client) => client.sourceQuoteId === quote.id || client.quoteId === quote.id || (client.name === quote.customerName && !client.sourceQuoteId && !client.quoteId));
+    const existingClient = clients.find((client) => client.id === quote.clientId || client.sourceQuoteId === quote.id || client.quoteId === quote.id);
+    if (!supabase) return toast.error("O banco de dados não está configurado.");
     if (quote.clientId || existingClient) {
-      if (!quote.clientId && existingClient) setQuotes((current) => current.map((item) => item.id === quote.id ? { ...item, clientId: existingClient.id, history: [...item.history, makeHistory("Vínculo de cliente recuperado", "Migração do cadastro", undefined, existingClient.id)] } : item));
-      return toast.info("Este orçamento já foi convertido em cliente.");
+      void (async () => {
+        const { error } = await supabase.rpc("convert_quote_to_customer", {
+          p_quote_id: quote.id,
+          p_client_id: existingClient?.id || quote.clientId || nextId("CLI", clients),
+        });
+        if (error) {
+          toast.error("Não foi possível recuperar o vínculo do cliente.", { description: error.message });
+          return;
+        }
+        await Promise.all([reloadQuotes(), reloadClients()]);
+        toast.info("Este orçamento já estava convertido em cliente; o vínculo foi conferido.");
+      })();
+      return;
     }
-    setConfirmation({ title: "Converter orçamento em cliente", description: `${quote.customerName} será criado sem novo preenchimento.`, detail: `Origem: ${quote.id}\nProduto: ${quote.productModel}\nContato: ${quote.phone}\nEndereço: ${quote.address}, ${quote.city}\nOs dados comerciais permanecem vinculados ao orçamento original.`, confirmLabel: "Converter cliente", onConfirm: () => {
-      const client = { id: nextId("CLI", clients), name: quote.customerName, phone: quote.phone, email: quote.email, address: quote.address, city: quote.city, taxId: quote.taxId, notes: quote.notes, source: "convertido de orçamento" as const, sourceQuoteId: quote.id, product: quote.productModel, quoteId: quote.id, history: [makeHistory("Cliente criado a partir do orçamento", "Tela de Orçamentos", undefined, "Cliente convertido")] };
-      setClients((current) => [client, ...current]);
-      setQuotes((current) => current.map((item) => item.id === quote.id ? { ...item, clientId: client.id, history: [...item.history, makeHistory("Orçamento convertido em cliente", "Tela de Orçamentos", item.status, "Cliente convertido")] } : item));
-      toast.success("Cliente convertido com sucesso");
-    } });
+    const clientId = nextId("CLI", clients);
+    setConfirmation({
+      title: "Converter orçamento em cliente",
+      description: `${quote.customerName} será criado sem novo preenchimento.`,
+      detail: `Origem: ${quote.id}\nProduto: ${quote.productModel}\nContato: ${quote.phone}\nEndereço: ${quote.address}, ${quote.city}\nOs dados comerciais permanecem vinculados ao orçamento original.`,
+      confirmLabel: "Converter cliente",
+      onConfirm: async () => {
+        const { error } = await supabase.rpc("convert_quote_to_customer", { p_quote_id: quote.id, p_client_id: clientId });
+        if (error) {
+          toast.error("Não foi possível converter o orçamento em cliente.", { description: error.message });
+          return;
+        }
+        await Promise.all([reloadQuotes(), reloadClients()]);
+        toast.success("Cliente convertido com sucesso");
+      },
+    });
   };
   const issueOS = (quote: WorkflowQuote) => {
     if (!canWorkflow(role, "issueOS")) return toast.error("Seu perfil não pode emitir OS.");
-    const client = clients.find((item) => item.id === quote.clientId || item.sourceQuoteId === quote.id || item.quoteId === quote.id || (item.name === quote.customerName && !item.sourceQuoteId && !item.quoteId));
+    const client = clients.find((item) => item.id === quote.clientId || item.sourceQuoteId === quote.id || item.quoteId === quote.id);
     if (quote.status !== "Aprovado") return toast.error("A OS só pode ser emitida para um orçamento aprovado.");
     if (!client) return toast.error("Converta o orçamento em cliente antes de emitir a OS.");
     if (quote.osId || orders.some((order) => order.quoteId === quote.id)) return toast.info("Este orçamento já possui uma OS vinculada.");
-    setConfirmation({ title: "Emitir ordem de serviço", description: `A OS será gerada para ${client.name}.`, detail: `Orçamento: ${quote.id}\nServiço: ${quote.productModel}\nMedidas: ${quote.measurements}\nMateriais: ${quote.materials}\nPrazo: ${quote.validUntil}\nA OS será validada antes do envio para produção.`, confirmLabel: "Emitir OS", onConfirm: () => {
-      const order = { id: nextId("OS", orders), clientId: client.id, clientName: client.name, quoteId: quote.id, service: quote.productModel, measurements: quote.measurements, materials: quote.materials, quantity: quote.quantity, color: quote.color, finish: quote.finish, deadline: quote.validUntil, notes: quote.notes, responsible: "A definir", priority: "Normal" as const, status: "Emitida" as const, history: [makeHistory("OS emitida a partir do orçamento", "Tela de Orçamentos", undefined, "Emitida")] };
-      setOrders((current) => [order, ...current]);
-      setQuotes((current) => current.map((item) => item.id === quote.id ? { ...item, osId: order.id, history: [...item.history, makeHistory("OS emitida", "Tela de Orçamentos", item.status, "OS emitida")] } : item));
-      setClients((current) => current.map((item) => item.id === client.id ? { ...item, osId: order.id, history: [...item.history, makeHistory("OS vinculada ao cadastro", "Tela de Orçamentos", undefined, order.id)] } : item));
-      toast.success(`${order.id} emitida com sucesso`);
-      onModuleChange("os");
-    } });
+    if (!supabase) return toast.error("O banco de dados não está configurado.");
+    const workOrderId = nextId("OS", orders);
+    setConfirmation({
+      title: "Emitir ordem de serviço",
+      description: `A OS será gerada para ${client.name}.`,
+      detail: `Orçamento: ${quote.id}\nServiço: ${quote.productModel}\nMedidas: ${quote.measurements}\nMateriais: ${quote.materials}\nPrazo: ${quote.validUntil}\nA OS será validada antes do envio para produção.`,
+      confirmLabel: "Emitir OS",
+      onConfirm: async () => {
+        const { data, error } = await supabase.rpc("issue_work_order_from_quote", { p_quote_id: quote.id, p_work_order_id: workOrderId });
+        if (error) {
+          toast.error("Não foi possível emitir a O.S.", { description: error.message });
+          return;
+        }
+        const actualOrderId = String(data?.work_order_id || workOrderId);
+        await Promise.all([reloadOrders(), reloadQuotes(), reloadClients()]);
+        window.localStorage.setItem("toldo:workflow-selected-os", actualOrderId);
+        toast.success(`${actualOrderId} emitida com sucesso`);
+        onModuleChange("os");
+      },
+    });
   };
   const sendProduction = (quote: WorkflowQuote) => {
     const order = orders.find((item) => item.id === quote.osId || item.quoteId === quote.id);
