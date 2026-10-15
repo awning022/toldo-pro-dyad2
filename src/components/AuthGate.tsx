@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
+import { useLocation } from "react-router-dom";
 import { AuthScreen } from "@/components/AuthScreen";
 import { CompanyAccessProvider, type CompanyAccess } from "@/lib/CompanyAccessContext";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
@@ -53,6 +54,7 @@ function SetPassword({ onComplete }: { onComplete: () => void }) {
 }
 
 export function AuthGate({ children }: { children: (access: CompanyAccess) => ReactNode }) {
+  const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [access, setAccess] = useState<CompanyAccess | null>(null);
   const [loading, setLoading] = useState(true);
@@ -187,6 +189,30 @@ export function AuthGate({ children }: { children: (access: CompanyAccess) => Re
       listener.subscription.unsubscribe();
     };
   }, [loadAccess]);
+
+  useEffect(() => {
+    if (!supabase || !access || !user) return;
+    let alive = true;
+    const writeEvent = async (eventType: "session_start" | "heartbeat") => {
+      if (!alive) return;
+      const { error: telemetryError } = await supabase.from("owner_telemetry").insert({
+        user_id: user.id, company_id: access.companyId, event_type: eventType,
+        route: location.pathname.slice(0, 180),
+      });
+      if (telemetryError) { /* Telemetry is best-effort and must not block app usage. */ }
+    };
+    void writeEvent("session_start");
+    const timer = window.setInterval(() => { void writeEvent("heartbeat"); }, 60000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [access?.companyId, user?.id]);
+
+  useEffect(() => {
+    if (!supabase || !access || !user) return;
+    void supabase.from("owner_telemetry").insert({
+      user_id: user.id, company_id: access.companyId, event_type: "route_view",
+      route: location.pathname.slice(0, 180),
+    });
+  }, [location.pathname, access?.companyId, user?.id]);
 
   if (!sessionReady || (user && loading)) return <AccessLoading>Carregando sua sessão e permissões...</AccessLoading>;
   if (setupRequired && user) {
