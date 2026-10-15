@@ -5,7 +5,6 @@ import { MaterialUseDialog, SupplyRequestDialog } from "@/components/InventoryAc
 import {
   makeHistory,
   type WorkflowInstallation,
-  type WorkflowOS,
 } from "@/lib/workflowData";
 import { useCompanyRecords } from "@/lib/useCompanyRecords";
 import { useCompanyAccess } from "@/lib/CompanyAccessContext";
@@ -14,7 +13,6 @@ import { toast } from "sonner";
 
 export function InstallationsView() {
   const { records: installations, setRecords: setInstallations, reload: reloadInstallations } = useCompanyRecords<WorkflowInstallation>("installations");
-  const { reload: reloadWorkOrders } = useCompanyRecords<WorkflowOS>("work_orders");
   const access = useCompanyAccess();
   const [useFor, setUseFor] = useState<WorkflowInstallation | null>(null);
   const [requestFor, setRequestFor] = useState<WorkflowInstallation | null>(null);
@@ -48,7 +46,7 @@ export function InstallationsView() {
         toast.error("O sistema não confirmou a conclusão da O.S.");
         return;
       }
-      await Promise.all([reloadInstallations(), reloadWorkOrders()]);
+      await reloadInstallations();
       toast.success(installation.osId
         ? `Instalação concluída e O.S. ${installation.osId} enviada para O.S. Concluídas.`
         : `Instalação de ${installation.customer} finalizada.`);
