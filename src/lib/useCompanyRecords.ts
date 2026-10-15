@@ -32,6 +32,7 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
   const enabled = options.enabled ?? true;
   const [records, setState] = useState<T[]>([]);
   const recordsRef = useRef<T[]>([]);
+  const persistedRef = useRef<T[]>([]);
   const [ready, setReady] = useState(false);
   const canViewFinancial = can("viewFinancial");
   const canEditFinance = can("manageFinance");
@@ -39,6 +40,7 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
   const load = useCallback(async () => {
     if (!enabled) {
       recordsRef.current = [];
+      persistedRef.current = [];
       setState([]);
       setReady(true);
       return;
@@ -46,6 +48,7 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
     if (!supabase) return;
     setReady(false);
     recordsRef.current = [];
+    persistedRef.current = [];
     setState([]);
     if (entity === "finance") {
       if (!canViewFinancial) {
@@ -67,6 +70,7 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
       }
       const loaded = (data || []).map((row) => ({ ...row.data, id: row.record_id })) as T[];
       recordsRef.current = loaded;
+      persistedRef.current = loaded;
       setState(loaded);
       setReady(true);
       return;
@@ -99,6 +103,7 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
       loaded = mergePrivateData(loaded, privateRows || []);
     }
     recordsRef.current = loaded;
+    persistedRef.current = loaded;
     setState(loaded);
     setReady(true);
   }, [canViewFinancial, companyId, enabled, entity]);
@@ -223,13 +228,14 @@ export function useCompanyRecords<T extends { id: string }>(entity: string, opti
       toast.info("Aguarde o carregamento dos registros antes de salvar.");
       return;
     }
-    const previous = recordsRef.current;
-    const next = typeof update === "function" ? update(previous) : update;
+    const current = recordsRef.current;
+    const next = typeof update === "function" ? update(current) : update;
     recordsRef.current = next;
     setState(next);
     const operation = saveQueueRef.current.catch(() => undefined).then(async () => {
-      const saved = await save(next, previous);
-      if (!saved) await load();
+      const saved = await save(next, persistedRef.current);
+      if (saved) persistedRef.current = next;
+      else await load();
     });
     saveQueueRef.current = operation.catch(async (error: unknown) => {
       console.error("Falha inesperada ao salvar registros da empresa", error);
