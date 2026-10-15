@@ -193,6 +193,7 @@ export function AuthGate({ children }: { children: (access: CompanyAccess) => Re
   useEffect(() => {
     if (!supabase || !access || !user) return;
     let alive = true;
+    const sessionStartedAt = Date.now();
     const writeEvent = async (eventType: "session_start" | "heartbeat") => {
       if (!alive) return;
       const { error: telemetryError } = await supabase.from("owner_telemetry").insert({
@@ -203,7 +204,17 @@ export function AuthGate({ children }: { children: (access: CompanyAccess) => Re
     };
     void writeEvent("session_start");
     const timer = window.setInterval(() => { void writeEvent("heartbeat"); }, 60000);
-    return () => { alive = false; window.clearInterval(timer); };
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      void supabase.from("owner_telemetry").insert({
+        user_id: user.id,
+        company_id: access.companyId,
+        event_type: "session_end",
+        route: location.pathname.slice(0, 180),
+        duration_ms: Math.min(600000, Math.max(0, Date.now() - sessionStartedAt)),
+      });
+    };
   }, [access?.companyId, user?.id]);
 
   useEffect(() => {
@@ -212,6 +223,24 @@ export function AuthGate({ children }: { children: (access: CompanyAccess) => Re
       user_id: user.id, company_id: access.companyId, event_type: "route_view",
       route: location.pathname.slice(0, 180),
     });
+  }, [location.pathname, access?.companyId, user?.id]);
+
+  useEffect(() => {
+    if (!supabase || !access || !user) return;
+    const recordClientError = () => {
+      void supabase.from("owner_telemetry").insert({
+        user_id: user.id,
+        company_id: access.companyId,
+        event_type: "client_error",
+        route: location.pathname.slice(0, 180),
+      });
+    };
+    window.addEventListener("error", recordClientError);
+    window.addEventListener("unhandledrejection", recordClientError);
+    return () => {
+      window.removeEventListener("error", recordClientError);
+      window.removeEventListener("unhandledrejection", recordClientError);
+    };
   }, [location.pathname, access?.companyId, user?.id]);
 
   if (!sessionReady || (user && loading)) return <AccessLoading>Carregando sua sessão e permissões...</AccessLoading>;
