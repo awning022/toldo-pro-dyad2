@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -228,15 +228,34 @@ function Sidebar({ active, onNavigate, open, onClose, collapsed, onToggleCollaps
 
 export default function Index({ access }: { access: CompanyAccess }) {
   const navigateTo = useNavigate();
+  const location = useLocation();
   const modules = useMemo(() => accessibleModules(access), [access]);
-  const [active, setActive] = useState<ModuleKey>("painel");
+  const moduleFromUrl = (): ModuleKey => {
+    const requested = new URLSearchParams(location.search).get("module");
+    return requested && modules.includes(requested as ModuleKey) ? requested as ModuleKey : "painel";
+  };
+  const [active, setActive] = useState<ModuleKey>(moduleFromUrl);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const userName = access.fullName.split(" ")[0] || access.email;
+
+  // Keep the current section in the URL so tab switches, refreshes, and browser history
+  // do not send the user back to the dashboard.
+  useEffect(() => {
+    const requested = new URLSearchParams(location.search).get("module");
+    const nextModule = requested && modules.includes(requested as ModuleKey) ? requested as ModuleKey : "painel";
+    setActive((current) => current === nextModule ? current : nextModule);
+  }, [location.search, modules]);
+
   const signOut = async () => { await supabase?.auth.signOut(); };
   const navigate = (module: ModuleKey) => {
     if (!modules.includes(module)) return toast.error("Sua conta não tem permissão para acessar essa área.");
     setActive(module);
+    const params = new URLSearchParams(location.search);
+    if (module === "painel") params.delete("module");
+    else params.set("module", module);
+    const search = params.toString();
+    navigateTo({ pathname: location.pathname, search: search ? `?${search}` : "" });
   };
 
   return <div className="min-h-screen bg-[#f5f7fa] text-[#172b4d]"><OnboardingGuide userKey={access.email || `${access.fullName}:${access.companyId || access.companyName}`} onNavigate={navigate} /><div className="flex min-h-screen"><Sidebar active={active} onNavigate={navigate} open={menuOpen} onClose={() => setMenuOpen(false)} collapsed={sidebarCollapsed} onToggleCollapsed={() => { if (window.matchMedia("(max-width: 1023px)").matches) { setMenuOpen(false); setSidebarCollapsed(false); } else { setSidebarCollapsed((current) => !current); } }} role={access.role} name={userName} companyName={access.companyName} modules={modules} /><main className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-[76px] items-center justify-between border-b border-[#e9edf3] bg-[#f5f7fa]/95 px-4 backdrop-blur-md sm:px-6 lg:px-9"><div className="flex items-center gap-3"><button onClick={() => setMenuOpen(true)} className="rounded-xl border border-[#e1e7ef] bg-white p-2 text-[#52647d] shadow-sm lg:hidden" aria-label="Abrir menu"><Menu size={19} /></button><button onClick={() => setSidebarCollapsed((current) => !current)} className="hidden lg:flex rounded-xl border border-[#e1e7ef] bg-white p-2 text-[#52647d] shadow-sm hover:border-[#f4b17e] hover:text-[#d9620d]" aria-label={sidebarCollapsed ? "Expandir barra lateral" : "Minimizar barra lateral"} title={sidebarCollapsed ? "Expandir menu" : "Minimizar menu"}>{sidebarCollapsed ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}</button><div className="flex items-center gap-2 text-[11px] font-semibold text-[#90a0b2]"><Building2 size={15} className="text-[#f47b20]" /> {access.companyName} <ChevronRight size={13} /><span className="text-[#52647d]">{access.role}</span></div></div><div className="flex items-center gap-2"><button onClick={() => window.dispatchEvent(new Event("toldo-pro:open-guide"))} title="Abrir guia de uso" aria-label="Abrir guia de uso" className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#e1e7ef] bg-white text-[#52647d] shadow-sm transition hover:border-[#f4b17e] hover:text-[#d9620d]"><CircleHelp size={17} /></button>{modules.includes("notificacoes") && <button onClick={() => navigate("notificacoes")} className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-[#e1e7ef] bg-white text-[#708096] shadow-sm" aria-label="Notificações"><Bell size={17} /></button>}<button onClick={() => navigateTo("/auth/change-email")} title="Alterar e-mail" aria-label="Alterar e-mail" className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#e1e7ef] bg-white text-[#52647d] shadow-sm"><Mail size={16} /></button><button onClick={signOut} className="flex h-9 items-center gap-2 rounded-xl border border-[#e1e7ef] bg-white px-2 shadow-sm"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#e4b89c] text-[9px] font-bold text-[#6d3e2a]">{userName.slice(0, 2).toUpperCase()}</span><span className="hidden max-w-[90px] truncate text-[10px] font-bold text-[#52647d] sm:inline">{userName}</span></button></div></header><div className="mx-auto max-w-[1480px] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">{active === "painel" ? <DashboardView onModuleChange={navigate} access={access} /> : <ModuleView module={active} onModuleChange={navigate} />}<footer className="mt-8 flex flex-col justify-between gap-2 border-t border-[#e5eaf0] pt-5 text-[10px] font-medium text-[#9aa6b6] sm:flex-row"><span>© 2026 Toldo Pro · Dados isolados por empresa</span><span className="flex items-center gap-1.5"><CircleHelp size={12} /> Central de ajuda <span className="mx-1">·</span> Termos e privacidade</span></footer></div></main></div></div>;
