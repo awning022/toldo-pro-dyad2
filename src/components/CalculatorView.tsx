@@ -213,6 +213,12 @@ function calculateProject(model: CalculatorModel, width: number, depth: number, 
       const totalLinear = linearPieces.reduce((sum, item) => sum + item, 0);
       needed = meters(totalLinear) + " em " + linearPieces.length + " corte(s)";
       purchased = stockCount + " barra(s) de " + meters(rule.stockLength);
+      if (rule.id === "fix-perfil-principal") {
+        const crossbarCount = Math.max(2, Math.ceil(width / Math.max(0.01, number(model.crossbarSpacing ?? 0.7))) + 1) * safeQuantity;
+        notes.push("Plano de corte sem emendas: 2 perfil(is) de largura (traseiro e frontal) de " + meters(width) + " + " + crossbarCount + " travessa(s) de " + meters(depth) + ".");
+      } else if (rule.id === "fix-pes") {
+        notes.push("Pés calculados separadamente: " + linearPieces.length + " corte(s) inteiro(s), sem emendas.");
+      }
       bars.forEach((bar, index) => {
         if (bar.remaining > 0.02) {
           const value = bar.remaining / rule.stockLength * number(rule.stockPrice);
