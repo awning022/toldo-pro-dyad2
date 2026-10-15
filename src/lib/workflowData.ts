@@ -95,6 +95,7 @@ export type WorkflowInstallation = {
   status: InstallationStatus;
   observations?: string;
   materials?: string[];
+  requiredMaterials?: string;
   photos?: string[]; // base64 or URLs
   productionId?: string;
   osId?: string;
