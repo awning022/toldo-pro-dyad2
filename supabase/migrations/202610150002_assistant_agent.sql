@@ -32,7 +32,7 @@ alter table public.assistant_messages enable row level security;
 drop policy if exists "Company members read assistant conversations" on public.assistant_conversations;
 create policy "Company members read assistant conversations"
   on public.assistant_conversations for select to authenticated
-  using (company_id = public.my_company_id());
+  using (company_id = public.my_company_id() and user_id = auth.uid());
 
 drop policy if exists "Company members create assistant conversations" on public.assistant_conversations;
 create policy "Company members create assistant conversations"
@@ -43,7 +43,7 @@ drop policy if exists "Company members update assistant conversations" on public
 create policy "Company members update assistant conversations"
   on public.assistant_conversations for update to authenticated
   using (company_id = public.my_company_id())
-  with check (company_id = public.my_company_id());
+  with check (company_id = public.my_company_id() and user_id = auth.uid());
 
 drop policy if exists "Company members read assistant messages" on public.assistant_messages;
 create policy "Company members read assistant messages"
