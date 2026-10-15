@@ -31,6 +31,7 @@ import {
   Search,
   Settings2,
   Settings,
+  Sparkles,
   Truck,
   UserRound,
   Users,
@@ -75,6 +76,7 @@ const navGroups = [
     { label: "Relatórios", module: "relatorios" as ModuleKey, icon: FileBarChart },
   ] },
   { label: "Tecnologia", items: [
+    { label: "IA Toldo Pro", module: "assistente" as ModuleKey, icon: Sparkles },
     { label: "Configurações", module: "configuracoes" as ModuleKey, icon: Settings },
   ] },
 ];
@@ -216,6 +218,7 @@ function accessibleModules(access: CompanyAccess): ModuleKey[] {
     ["estoque", access.can("manageStock") || access.can("requestMaterials")],
     ["financeiro", access.can("viewFinancial")],
     ["relatorios", access.can("viewFinancial") || access.can("manageCustomers") || access.can("manageProduction")],
+    ["assistente", access.can("accessAssistant")],
     ["configuracoes", access.can("editRules")],
   ] as const;
   allowed.forEach(([module, enabled]) => { if (enabled) modules.push(module); });
