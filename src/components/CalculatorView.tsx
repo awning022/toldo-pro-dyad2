@@ -94,7 +94,7 @@ const defaultModels: CalculatorModel[] = [
     defaultWidth: 5, defaultDepth: 3, crossbarSpacing: 0.7, laborCost: 0, extraCost: 0, marginPercent: 30, taxPercent: 0, createdAt: "", updatedAt: "",
     materials: [
       { ...newMaterial("Policarbonato alveolar 6 mm fumê"), id: "fix-chapa", type: "sheet", stockLength: 6, stockWidth: 2.1, formulaA: "width", formulaB: "depth", count: 1, kerf: 0.003 },
-      { ...newMaterial("Perfil principal de alumínio (traseiro, frontal e travessas)"), id: "fix-perfil-principal", type: "linear", stockLength: 6, formulaA: "width", count: 1, kerf: 0.003 },
+      { ...newMaterial("Perfil principal de alumínio (traseiro, frontal e travessas)"), id: "fix-perfil-principal", type: "linear", stockLength: 6, formulaA: "width", count: 1, kerf: 0 },
       { ...newMaterial("Pés de alumínio (perfil separado)"), id: "fix-pes", type: "linear", stockLength: 6, formulaA: "fixed", fixedA: 2.5, count: 2, kerf: 0.003 },
       { ...newMaterial("Parafusos e acessórios"), id: "fix-paraf", type: "unit", stockLength: 1, stockWidth: 0, formulaA: "fixed", fixedA: 1, count: 12, kerf: 0 },
     ],
