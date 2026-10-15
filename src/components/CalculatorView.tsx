@@ -414,18 +414,35 @@ export function CalculatorView() {
     const legacyProfileOptions = [existingById.get("fix-frontal"), existingById.get("fix-travessas"), existingById.get("fix-traseiro")].filter(Boolean) as MaterialRule[];
     const legacyProfile = legacyProfileOptions.find((item) => number(item.stockPrice) > 0) || legacyProfileOptions[0];
     const migratedMaterials = fixedTemplate.materials.map((templateMaterial) => {
-      let saved = existingById.get(templateMaterial.id);
-      if (templateMaterial.id === "fix-perfil-principal") saved = legacyProfile || saved;
-      if (!saved) return { ...templateMaterial };
+      const saved = existingById.get(templateMaterial.id);
+      if (!saved) {
+        if (templateMaterial.id === "fix-perfil-principal" && legacyProfile) {
+          return {
+            ...templateMaterial,
+            stockPrice: legacyProfile.stockPrice ?? templateMaterial.stockPrice,
+            stockLength: legacyProfile.stockLength ?? templateMaterial.stockLength,
+            stockWidth: legacyProfile.stockWidth ?? templateMaterial.stockWidth,
+          };
+        }
+        return { ...templateMaterial };
+      }
       existingById.delete(templateMaterial.id);
-      return {
+      const migrated: MaterialRule = {
         ...templateMaterial,
-        stockPrice: saved.stockPrice,
-        stockLength: saved.stockLength || templateMaterial.stockLength,
-        stockWidth: saved.stockWidth || templateMaterial.stockWidth,
+        ...saved,
+        id: templateMaterial.id,
+        stockLength: saved.stockLength ?? templateMaterial.stockLength,
+        stockWidth: saved.stockWidth ?? templateMaterial.stockWidth,
+        allowRotation: saved.allowRotation ?? templateMaterial.allowRotation,
       };
+      // Corrige apenas a orientação legada da chapa; não sobrescreve ajustes feitos depois pelo usuário.
+      if (templateMaterial.id === "fix-chapa" && saved.formulaA === "depth" && saved.formulaB === "width") {
+        migrated.formulaA = templateMaterial.formulaA;
+        migrated.formulaB = templateMaterial.formulaB;
+      }
+      return migrated;
     });
-    // Remove linhas antigas separadas (agora o perfil principal é único), mas preserva materiais personalizados.
+    // Remove as linhas antigas separadas, mas preserva preços/dimensões transferidos e materiais personalizados.
     ["fix-traseiro", "fix-frontal", "fix-travessas", "fix-lateral", "fix-calha"].forEach((id) => existingById.delete(id));
     migratedMaterials.push(...existingById.values());
     const needsMigration = JSON.stringify(existing.materials) !== JSON.stringify(migratedMaterials)
@@ -433,7 +450,7 @@ export function CalculatorView() {
       || existing.marginPercent == null || existing.taxPercent == null;
     if (needsMigration) {
       setModels(models.map((model) => model.id === fixedTemplate.id
-        ? { ...model, name: fixedTemplate.name, crossbarSpacing: model.crossbarSpacing ?? fixedTemplate.crossbarSpacing,
+        ? { ...model, name: model.name || fixedTemplate.name, crossbarSpacing: model.crossbarSpacing ?? fixedTemplate.crossbarSpacing,
             laborCost: model.laborCost ?? fixedTemplate.laborCost, extraCost: model.extraCost ?? fixedTemplate.extraCost,
             marginPercent: model.marginPercent ?? fixedTemplate.marginPercent, taxPercent: model.taxPercent ?? fixedTemplate.taxPercent,
             materials: migratedMaterials, updatedAt: now }
