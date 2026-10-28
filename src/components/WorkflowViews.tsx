@@ -398,7 +398,7 @@ function WorkflowOSView({ onModuleChange }: WorkflowViewProps) {
         p_work_order_id: order.id,
         p_production_id: productionId,
       });
-      if (error) return toast.error("Não foi possível enviar a OS para produção.", { description: error.message });
+      if (error) { toast.error("Não foi possível enviar a OS para produção.", { description: error.message }); return; }
       await Promise.all([reloadOrders(), reloadProductions()]);
       toast.success(`${productionId} criada sem dados financeiros`);
       onModuleChange("operacao");
