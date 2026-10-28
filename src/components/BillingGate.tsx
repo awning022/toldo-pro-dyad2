@@ -49,7 +49,7 @@ export function BillingGate({ access, children }: { access: CompanyAccess; child
     window.location.assign(data.checkout_url);
   };
 
-  if (access.email.toLowerCase() === "awningbrasil@gmail.com") return <>{children}</>;
+  if (access.email.toLowerCase() === "awningbrasil@gmail.com" || import.meta.env.VITE_BILLING_ENFORCED !== "true") return <>{children}</>;
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-[#f5f7fa] p-6 text-sm font-semibold text-[#52647d]">Verificando sua assinatura...</div>;
 
   const trialEnd = subscription?.trial_ends_at ? new Date(subscription.trial_ends_at) : null;
