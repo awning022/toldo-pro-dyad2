@@ -28,13 +28,14 @@ export function MaterialUseDialog({ orderId, area, onClose, onUsed }: {
 
   // Stock records load asynchronously; choose the first available material after they arrive.
   useEffect(() => {
-    if (!materialId && materials.length > 0) setMaterialId(materials[0].id);
+    if (!materialId && materials.length > 0) setMaterialId(String(materials[0].id));
   }, [materials, materialId]);
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const amount = Number(quantity);
-    const usedMaterial = materials.find((item) => item.id === materialId);
+    const normalizedMaterialId = String(materialId).trim();
+    const usedMaterial = materials.find((item) => String(item.id).trim() === normalizedMaterialId);
     if (!usedMaterial) return toast.error("Material não encontrado no estoque.");
     if (!Number.isFinite(amount) || amount <= 0) return toast.error("Informe uma quantidade válida.");
     const { error } = await supabase.rpc("record_stock_movement", {
@@ -57,9 +58,9 @@ export function MaterialUseDialog({ orderId, area, onClose, onUsed }: {
     <p className="mt-1 text-[11px] text-[#8d9aaa]">A saída será registrada no pedido {orderId}.</p>
     <form onSubmit={save} className="mt-5 grid gap-4">
       <label className={label}>Material
-        <select required value={materialId} onChange={(event) => setMaterialId(event.target.value)} className="h-10 w-full rounded-xl border border-[#e1e7ef] bg-white px-3 text-[12px]" disabled={materials.length === 0}>
+        <select required value={materialId} onChange={(event) => setMaterialId(String(event.target.value))} className="h-10 w-full rounded-xl border border-[#e1e7ef] bg-white px-3 text-[12px]" disabled={materials.length === 0}>
           {materials.length === 0 ? <option value="">Nenhum material cadastrado no estoque</option> : <option value="" disabled>Selecione um material</option>}
-          {materials.map((material) => <option key={material.id} value={material.id}>{material.name} · {material.quantity} {material.unit} disponíveis</option>)}
+          {materials.map((material) => <option key={String(material.id)} value={String(material.id)}>{material.name} · {material.quantity} {material.unit} disponíveis</option>)}
         </select>
         {materials.length === 0 && <span className="text-[10px] font-medium text-[#c35c42]">Cadastre primeiro o material na área Estoque para conseguir dar baixa aqui.</span>}
       </label>
