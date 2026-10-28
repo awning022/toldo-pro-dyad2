@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { User } from "@supabase/supabase-js";
 import { useLocation } from "react-router-dom";
 import { AuthScreen } from "@/components/AuthScreen";
+import { BillingGate } from "@/components/BillingGate";
 import { CompanyAccessProvider, type CompanyAccess } from "@/lib/CompanyAccessContext";
 import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 import { setCurrentWorkflowActor } from "@/lib/workflowData";
@@ -262,5 +263,5 @@ export function AuthGate({ children }: { children: (access: CompanyAccess) => Re
     return <AccessLoading><div><p>Esta conta ainda não está vinculada a uma empresa.</p><p className="mt-2 text-xs font-normal">Peça ao administrador da empresa para enviar um convite para este e-mail.</p><button onClick={() => void supabase?.auth.signOut()} className="mt-4 rounded-xl bg-[#17324d] px-4 py-2 text-white">Sair</button></div></AccessLoading>;
   }
 
-  return <CompanyAccessProvider value={access}>{children(access)}</CompanyAccessProvider>;
+  return <CompanyAccessProvider value={access}><BillingGate access={access}>{children(access)}</BillingGate></CompanyAccessProvider>;
 }
