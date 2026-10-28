@@ -64,7 +64,7 @@ function useWorkflowList<T extends { id: string }>(key: string, normalize: (valu
   const { records, setRecords, reload } = useCompanyRecords<T & { id: string }>(entity);
   const items = useMemo(() => records.map(normalize), [normalize, records]);
   const update = (next: T[] | ((current: T[]) => T[])) => {
-    setRecords((current) => {
+    return setRecords((current) => {
       const normalized = current.map(normalize);
       return typeof next === "function" ? next(normalized) : next;
     });
