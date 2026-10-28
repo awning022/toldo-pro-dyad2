@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,9 +22,15 @@ export function MaterialUseDialog({ orderId, area, onClose, onUsed }: {
 }) {
   const { records: materials, reload: reloadMaterials } = useCompanyRecords<StockMaterial>("materials");
   const { reload: reloadMovements } = useCompanyRecords<StockMovement>("stock_movements");
-  const [materialId, setMaterialId] = useState(materials[0]?.id || "");
+  const [materialId, setMaterialId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Stock records load asynchronously; choose the first available material after they arrive.
+  useEffect(() => {
+    if (!materialId && materials.length > 0) setMaterialId(materials[0].id);
+  }, [materials, materialId]);
+
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const amount = Number(quantity);
@@ -51,9 +57,11 @@ export function MaterialUseDialog({ orderId, area, onClose, onUsed }: {
     <p className="mt-1 text-[11px] text-[#8d9aaa]">A saída será registrada no pedido {orderId}.</p>
     <form onSubmit={save} className="mt-5 grid gap-4">
       <label className={label}>Material
-        <select required value={materialId} onChange={(event) => setMaterialId(event.target.value)} className="h-10 rounded-xl border border-[#e1e7ef] bg-white px-3 text-[12px]">
+        <select required value={materialId} onChange={(event) => setMaterialId(event.target.value)} className="h-10 w-full rounded-xl border border-[#e1e7ef] bg-white px-3 text-[12px]" disabled={materials.length === 0}>
+          {materials.length === 0 ? <option value="">Nenhum material cadastrado no estoque</option> : <option value="" disabled>Selecione um material</option>}
           {materials.map((material) => <option key={material.id} value={material.id}>{material.name} · {material.quantity} {material.unit} disponíveis</option>)}
         </select>
+        {materials.length === 0 && <span className="text-[10px] font-medium text-[#c35c42]">Cadastre primeiro o material na área Estoque para conseguir dar baixa aqui.</span>}
       </label>
       <label className={label}>Quantidade utilizada
         <Input type="number" min="0.001" step="0.001" required value={quantity} onChange={(event) => setQuantity(event.target.value)} className={inputClass} />
