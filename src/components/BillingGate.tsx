@@ -63,11 +63,11 @@ export function BillingGate({ access, children }: { access: CompanyAccess; child
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#fff1e7] text-[#e66f17]"><CreditCard size={23} /></div>
       <p className="mt-6 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#e66f17]">Toldo Pro · Assinatura</p>
       <h1 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-[#17324d]">Comece seus 7 dias grátis</h1>
-      <p className="mt-3 text-sm leading-6 text-[#718398]">Cadastre seu cartão no ambiente seguro do Mercado Pago. Você não será cobrado durante o teste; depois, a assinatura passa a custar R$ 230,00 por mês, até cancelar.</p>
+      <p className="mt-3 text-sm leading-6 text-[#718398]">Cadastre seu cartão no ambiente seguro do Mercado Pago. Você não será cobrado durante o teste; depois, a assinatura passa a custar R$ 199,99 por mês, até cancelar.</p>
       <div className="mt-5 space-y-3 rounded-2xl bg-[#f7f9fc] p-4 text-xs leading-5 text-[#52647d]">
         <p className="flex gap-2"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-[#14835b]" /> O cartão é cadastrado no Mercado Pago; o Toldo Pro não armazena os dados do cartão.</p>
         <p>• O teste só começa depois que o Mercado Pago confirmar a autorização da assinatura.</p>
-        <p>• Ao fim dos 7 dias, a cobrança recorrente de R$ 230,00/mês começa automaticamente, conforme os termos do Mercado Pago.</p>
+        <p>• Ao fim dos 7 dias, a cobrança recorrente de R$ 199,99/mês começa automaticamente, conforme os termos do Mercado Pago.</p>
         {subscription?.status && <p>• Situação atual: <strong>{subscription.status}</strong>.</p>}
       </div>
       {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-xs text-red-700">{error}</p>}
