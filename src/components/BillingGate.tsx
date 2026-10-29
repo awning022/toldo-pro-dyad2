@@ -83,6 +83,18 @@ export function BillingGate({ access, children }: { access: CompanyAccess; child
   return <div className="flex min-h-screen items-center justify-center bg-[#f5f7fa] px-4 py-10">
     <main className="w-full max-w-[520px] rounded-[28px] border border-[#e4eaf1] bg-white p-7 shadow-[0_20px_60px_rgba(23,43,77,0.10)] sm:p-9">
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#fff1e7] text-[#e66f17]"><CreditCard size={23} /></div>
+      <div className="mt-1 flex items-center gap-3 rounded-2xl border border-[#dceaf8] bg-[#f5faff] px-4 py-3">
+        <img
+          src="https://cdn.simpleicons.org/mercadopago/009EE3"
+          alt="Logo do Mercado Pago"
+          className="h-8 w-8 shrink-0"
+          loading="eager"
+        />
+        <div className="min-w-0">
+          <p className="text-sm font-extrabold text-[#17324d]">Parceiro de cobrança: Mercado Pago</p>
+          <p className="mt-0.5 text-xs text-[#718398]">Pagamento e cadastro do cartão em ambiente seguro do Mercado Pago.</p>
+        </div>
+      </div>
       <p className="mt-6 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#e66f17]">Toldo Pro · Assinatura</p>
       <h1 className="mt-2 font-display text-2xl font-extrabold tracking-tight text-[#17324d]">Comece seus 7 dias grátis</h1>
       <p className="mt-3 text-sm leading-6 text-[#718398]">Cadastre seu cartão no ambiente seguro do Mercado Pago. Você não será cobrado durante o teste; depois, a assinatura passa a custar R$ 199,99 por mês, até cancelar.</p>
