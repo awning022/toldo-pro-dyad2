@@ -10,6 +10,22 @@ type Subscription = {
   plan_amount: number;
 };
 
+function readableFunctionError(error: unknown): string {
+  if (error && typeof error === "object") {
+    const e = error as { message?: string; context?: unknown };
+    const context = e.context;
+    if (context instanceof Response) {
+      // The response body is read by the SDK in many cases; clone it before parsing.
+      void context.clone().json().catch(() => null);
+    }
+    if (context && typeof context === "object" && "json" in context && typeof (context as { json?: unknown }).json === "function") {
+      return e.message || "O servidor recusou a criação do checkout. Atualize o status e tente novamente.";
+    }
+    return e.message || "Não foi possível iniciar o checkout. Tente novamente.";
+  }
+  return "Não foi possível iniciar o checkout. Tente novamente.";
+}
+
 export function BillingGate({ access, children }: { access: CompanyAccess; children: ReactNode }) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +60,9 @@ export function BillingGate({ access, children }: { access: CompanyAccess; child
     setError("");
     const { data, error: invokeError } = await supabase.functions.invoke("create-subscription-checkout", { body: {} });
     if (invokeError || !data?.checkout_url) {
-      setError(data?.error || invokeError?.message || "Não foi possível abrir o checkout. Tente novamente.");
+      const serverMessage = data?.error;
+      const details = data?.details;
+      setError([serverMessage, details].filter((part) => typeof part === "string" && part.trim()).join(" — ") || readableFunctionError(invokeError));
       setStarting(false);
       return;
     }
