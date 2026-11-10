@@ -87,7 +87,7 @@ export function BillingGate({ access, children }: { access: CompanyAccess; child
     <main className="relative w-full max-w-[680px] overflow-hidden rounded-[30px] border border-[#e2e8f0] bg-white shadow-[0_28px_90px_rgba(23,43,77,0.13)]">
       <div className="bg-gradient-to-r from-[#102d49] via-[#173e60] to-[#1d5570] px-7 py-8 text-white sm:px-10 sm:py-10">
         <div className="flex items-center justify-between gap-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#d9efff]"><Sparkles size={13} /> Condição especial para sua empresa</div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#d9efff]"><Sparkles size={13} /> Desconto vitalício selecionado</div>
           <div className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-white/15 bg-white/10 sm:flex"><Building2 size={21} /></div>
         </div>
         <p className="mt-7 text-xs font-bold uppercase tracking-[0.2em] text-[#b9d8ee]">Toldo Pro · Plano empresarial</p>
@@ -99,7 +99,7 @@ export function BillingGate({ access, children }: { access: CompanyAccess; child
         <div className="rounded-[24px] border border-[#e7edf4] bg-[#f8fafc] p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs font-extrabold uppercase tracking-[0.13em] text-[#52647d]">Oferta de seleção</span>
-            <span className="rounded-full bg-[#e7f5ef] px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[#14764f]">Desconto especial</span>
+            <span className="rounded-full bg-[#e7f5ef] px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-[#14764f]">Desconto vitalício</span>
           </div>
           <div className="mt-4 flex flex-wrap items-end gap-x-4 gap-y-2">
             <div>
@@ -108,7 +108,7 @@ export function BillingGate({ access, children }: { access: CompanyAccess; child
             </div>
             <span className="mb-1 rounded-xl bg-[#fff1e6] px-3 py-2 text-xs font-extrabold text-[#c65d12]">Economize {money(regularPrice - specialPrice)} por mês</span>
           </div>
-          <p className="mt-3 text-xs leading-5 text-[#718398]">Condição promocional apresentada às empresas selecionadas. A cobrança mensal começa somente após a contratação e confirmação pelo Mercado Pago.</p>
+          <p className="mt-3 text-xs leading-5 text-[#718398]">Desconto vitalício especial concedido às empresas selecionadas. O valor de R$ 199,99 por mês é mantido enquanto a assinatura permanecer ativa. A cobrança começa somente após a contratação e confirmação pelo Mercado Pago.</p>
         </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
